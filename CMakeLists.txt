@@ -5,11 +5,12 @@ find_package(catkin REQUIRED COMPONENTS
   auv_msgs
   ros_imc_broker
   roscpp
+  tf
 )
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS auv_msgs ros_imc_broker roscpp
+  CATKIN_DEPENDS auv_msgs ros_imc_broker roscpp tf
 )
 
 include_directories(
