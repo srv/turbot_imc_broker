@@ -31,11 +31,32 @@
 
 // IMC messages to use: classes will be IMC::MessageType
 #include <IMC/Spec/EstimatedState.hpp>
+#include <IMC/Spec/Announce.hpp>
 
-TurbotIMCBroker::TurbotIMCBroker() {
+TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   ros::NodeHandle nhp("~");
-  estimated_state_pub_ = nhp.advertise<IMC::EstimatedState>("/IMC/In/EstimatedState", 1);
+
+  // Advertise ROS or IMC/Out messages
+  estimated_state_pub_ = nhp.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
+  announce_pub_ = nhp.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
+
+  // Subscribe to ROS or IMC/In messages
   nav_sts_sub_ = nhp.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+
+  // Create timers
+  announce_timer_ = nhp.createTimer(ros::Duration(0.1), &TurbotIMCBroker::AnnounceTimer, this);
+}
+
+void TurbotIMCBroker::AnnounceTimer(const ros::TimerEvent&) {
+  if (!nav_sts_received_) return;
+  IMC::Announce announce_msg;
+  announce_msg.sys_name = "turbot-auv";
+  announce_msg.sys_type = IMC::SYSTEMTYPE_UUV;
+  announce_msg.owner = 0;  // ?
+  announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
+  announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
+  announce_msg.height = 0;
+  announce_pub_.publish(announce_msg);
 }
 
 void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
@@ -79,6 +100,11 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   imc_msg.vx = ned_velocity.x();
   imc_msg.vy = ned_velocity.y();
   imc_msg.vz = ned_velocity.z();
+
+  nav_sts_ = *msg;
+  if (!nav_sts_received_) {
+    nav_sts_received_ = true;
+  }
 
   estimated_state_pub_.publish(imc_msg);
 }

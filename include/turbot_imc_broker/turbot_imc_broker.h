@@ -23,16 +23,21 @@
 #include <ros/ros.h>
 #include <auv_msgs/NavSts.h>
 
-class TurbotIMCBroker
-{
-public:
-    TurbotIMCBroker();
+class TurbotIMCBroker {
+ public:
+  TurbotIMCBroker();
 
-protected:
-    // Callbacks
-    void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
+ protected:
+  // Callbacks
+  void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
+  void AnnounceTimer(const ros::TimerEvent&);
 
-private:
-    ros::Publisher estimated_state_pub_;
-    ros::Subscriber nav_sts_sub_;
+ private:
+  ros::Publisher estimated_state_pub_;
+  ros::Publisher announce_pub_;
+  ros::Subscriber nav_sts_sub_;
+  ros::Timer announce_timer_;
+
+  auv_msgs::NavSts nav_sts_;
+  bool nav_sts_received_;
 };
