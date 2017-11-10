@@ -22,6 +22,7 @@
 
 #include <ros/ros.h>
 #include <auv_msgs/NavSts.h>
+#include <cyclops_rhodamine_ros/Rhodamine.h>
 
 class TurbotIMCBroker {
  public:
@@ -31,13 +32,19 @@ class TurbotIMCBroker {
   // Callbacks
   void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
   void AnnounceTimer(const ros::TimerEvent&);
+  void RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg);
+
 
  private:
   ros::Publisher estimated_state_pub_;
   ros::Publisher announce_pub_;
   ros::Subscriber nav_sts_sub_;
+  ros::Publisher rhodamine_pub_;
+  ros::Subscriber rhodamine_sub_;
   ros::Timer announce_timer_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
+
+   
 };

@@ -39,9 +39,11 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nhp.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   announce_pub_ = nhp.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
-
+  rhodamine_pub_ = nhp.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 1);
   // Subscribe to ROS or IMC/In messages
   nav_sts_sub_ = nhp.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+// subscribe to a /cyclops_rhodamine_ros/Rhodamine.msg , convert it into an /IMC/Out/RhodamineDye message and publish
+  rhodamine_sub_ = nhp.subscribe("/cyclops_rhodamine_ros/Rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
 
   // Create timers
   announce_timer_ = nhp.createTimer(ros::Duration(0.1), &TurbotIMCBroker::AnnounceTimer, this);
@@ -57,13 +59,33 @@ void TurbotIMCBroker::AnnounceTimer(const ros::TimerEvent&) {
   announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
   announce_msg.height = 0;
   announce_pub_.publish(announce_msg);
+
 }
+
+void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
+IMC::RhodamineDye rhodamine_msg;
+rhodamine_msg.value = (float)msg->concentration_ppb;
+double raw = msg->concentration_raw; // this is only for the csv file. The IMC message only must contain the ppb value
+rhodamine_pub_.publish(rhodamine_msg); // publish rhodamine message
+
+double latitud = nav_sts_.global_position.latitude*M_PI/180.0;
+double longitud = nav_sts_.global_position.longitude*M_PI/180.0;
+// we need the time stamps and the latitude/longitude for the CSV file
+
+/* lauv-xplore-1, Cyclops7, Rhodamine, 1 Hz
+% 22/06/2015 11:52
+% Not valid value (-1)
+% Time (seconds), Latitude (degrees), Longitude (degrees),Depth (meters), Rhodamine (ppb),Rhodamine (raw), Temperature (Celsius)*/
+
+}
+
 
 void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   IMC::EstimatedState imc_msg;
   // NED origin
   imc_msg.lat = msg->origin.latitude*M_PI/180.0;
   imc_msg.lon = msg->origin.longitude*M_PI/180.0;
+  
   imc_msg.height = 0;
 
   // Offset WRT NED origin
