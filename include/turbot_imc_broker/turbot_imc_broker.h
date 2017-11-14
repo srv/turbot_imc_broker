@@ -23,10 +23,31 @@
 #include <ros/ros.h>
 #include <auv_msgs/NavSts.h>
 #include <cyclops_rhodamine_ros/Rhodamine.h>
+#include <string>
+#include <fstream>
+
+using namespace std;
+
 
 class TurbotIMCBroker {
  public:
+
+  struct Params
+  {
+    string outdir;            //!> Output directory
+    string filename;
+    // Default settings
+    Params () {
+      outdir            = "";
+      filename          = "";
+      }
+  };
+
+  inline void setParams(const Params& params){params_ = params;}
+
+
   TurbotIMCBroker();
+
 
  protected:
   // Callbacks
@@ -36,6 +57,8 @@ class TurbotIMCBroker {
 
 
  private:
+
+  Params params_; //!> Stores parameters.
   ros::Publisher estimated_state_pub_;
   ros::Publisher announce_pub_;
   ros::Subscriber nav_sts_sub_;

@@ -34,19 +34,19 @@
 #include <IMC/Spec/Announce.hpp>
 
 TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
-  ros::NodeHandle nhp("~");
+  ros::NodeHandle nh("~");
 
   // Advertise ROS or IMC/Out messages
-  estimated_state_pub_ = nhp.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
-  announce_pub_ = nhp.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
-  rhodamine_pub_ = nhp.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 1);
+  estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
+  announce_pub_ = nh.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
+  rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 1);
   // Subscribe to ROS or IMC/In messages
-  nav_sts_sub_ = nhp.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+  nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
 // subscribe to a /cyclops_rhodamine_ros/Rhodamine.msg , convert it into an /IMC/Out/RhodamineDye message and publish
-  rhodamine_sub_ = nhp.subscribe("/cyclops_rhodamine_ros/Rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
+  rhodamine_sub_ = nh.subscribe("/cyclops_rhodamine_ros/Rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
 
   // Create timers
-  announce_timer_ = nhp.createTimer(ros::Duration(0.1), &TurbotIMCBroker::AnnounceTimer, this);
+  announce_timer_ = nh.createTimer(ros::Duration(0.1), &TurbotIMCBroker::AnnounceTimer, this);
 }
 
 void TurbotIMCBroker::AnnounceTimer(const ros::TimerEvent&) {
@@ -68,9 +68,28 @@ rhodamine_msg.value = (float)msg->concentration_ppb;
 double raw = msg->concentration_raw; // this is only for the csv file. The IMC message only must contain the ppb value
 rhodamine_pub_.publish(rhodamine_msg); // publish rhodamine message
 
-double latitud = nav_sts_.global_position.latitude*M_PI/180.0;
-double longitud = nav_sts_.global_position.longitude*M_PI/180.0;
+double latitude = nav_sts_.global_position.latitude*M_PI/180.0;
+double longitude = nav_sts_.global_position.longitude*M_PI/180.0;
+double depth = nav_sts_.position.depth; 
 // we need the time stamps and the latitude/longitude for the CSV file
+double seconds=msg->Header.stamp.toSec();
+/**Lets writte all data in a csv file */
+
+string csv_file = params_.outdir + "/" + params_.filename;
+fstream f_csv(csv_file.c_str(), ios::out | ios::app);
+
+    f_csv << fixed <<
+    setprecision(6) <<
+    seconds << "," <<
+    latitude << "," <<
+    longitude << "," <<
+    depth << "," <<
+    (float)msg->concentration_ppb << "," <<
+    msg->concentration_raw << "," <<
+    -1 <<  endl;
+
+    f_csv.close();
+  
 
 /* lauv-xplore-1, Cyclops7, Rhodamine, 1 Hz
 % 22/06/2015 11:52
@@ -130,3 +149,8 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
 
   estimated_state_pub_.publish(imc_msg);
 }
+
+
+
+ 
+    
