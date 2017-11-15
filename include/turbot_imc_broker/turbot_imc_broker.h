@@ -34,12 +34,18 @@ class TurbotIMCBroker {
 
   struct Params
   {
-    string outdir;            //!> Output directory
-    string filename;
+    std::string outdir;        //!> Output directory
+    std::string filename;      //!> CSV filename
+    std::string system_name;   //!> AUV name
+    int auv_id;                //!> AUV identifier
+    int entity_id;             //!> Entity identifier
     // Default settings
     Params () {
-      outdir            = "";
-      filename          = "";
+      outdir            = "/tmp";
+      filename          = "rhodamine.csv";
+      system_name       = "turbot";
+      auv_id            = 0x2000;
+      entity_id         = 0xFF;
       }
   };
 
@@ -52,7 +58,7 @@ class TurbotIMCBroker {
  protected:
   // Callbacks
   void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
-  void AnnounceTimer(const ros::TimerEvent&);
+  void Timer(const ros::TimerEvent&);
   void RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg);
 
 
@@ -66,12 +72,8 @@ class TurbotIMCBroker {
   ros::Subscriber nav_sts_sub_;
   ros::Publisher rhodamine_pub_;
   ros::Subscriber rhodamine_sub_;
-  ros::Timer announce_timer_;
+  ros::Timer timer_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
-
-  int auv_id_;
-  int entity_id_;
-  std::string system_name_;
 };
