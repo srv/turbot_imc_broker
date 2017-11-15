@@ -24,7 +24,17 @@
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "turbot_imc_broker");
+  ros::NodeHandle nh;
+  ros::NodeHandle nhp("~");
+
+  // Read parameters
+  TurbotIMCBroker::Params params;
+  string outdir, filename;
+  nhp.param("outdir", params.outdir, string(""));
+  nhp.param("filename", params.filename, string(""));
+
   TurbotIMCBroker tb;
+  tb.setParams(params);
   ros::MultiThreadedSpinner spinner(4);  // Use 4 threads
   spinner.spin();  // spin() will not return until the node has been shutdown
   return 0;

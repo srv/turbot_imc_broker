@@ -35,7 +35,7 @@
 #include <IMC/Spec/Heartbeat.hpp>
 
 TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
-  ros::NodeHandle nhp("~");
+  ros::NodeHandle nh("~");
 
   nhp.param("auv_id", auv_id_, 0x1A);
   nhp.param("entity_id", entity_id_, 255);  // LSTS said
@@ -45,9 +45,12 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   estimated_state_pub_ = nhp.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   heartbeat_pub_ = nhp.advertise<IMC::Heartbeat>("/IMC/Out/Heartbeat", 100);
   announce_pub_ = nhp.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
+  rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 1);
 
   // Subscribe to ROS or IMC/In messages
-  nav_sts_sub_ = nhp.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+  nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+// subscribe to a /cyclops_rhodamine_ros/Rhodamine.msg , convert it into an /IMC/Out/RhodamineDye message and publish
+  rhodamine_sub_ = nh.subscribe("/cyclops_rhodamine_ros/Rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
 
   // Create timers
   announce_timer_ = nhp.createTimer(ros::Duration(1), &TurbotIMCBroker::AnnounceTimer, this);
@@ -77,6 +80,41 @@ void TurbotIMCBroker::AnnounceTimer(const ros::TimerEvent&) {
   heartbeat_pub_.publish(heartbeat_msg);
 }
 
+void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
+  IMC::RhodamineDye rhodamine_msg;
+  rhodamine_msg.value = (float)msg->concentration_ppb;
+  double raw = msg->concentration_raw; // this is only for the csv file. The IMC message only must contain the ppb value
+  rhodamine_pub_.publish(rhodamine_msg); // publish rhodamine message
+
+  double latitude = nav_sts_.global_position.latitude*M_PI/180.0;
+  double longitude = nav_sts_.global_position.longitude*M_PI/180.0;
+  double depth = nav_sts_.position.depth;
+  // we need the time stamps and the latitude/longitude for the CSV file
+  double seconds=msg->Header.stamp.toSec();
+  /**Lets writte all data in a csv file */
+
+  string csv_file = params_.outdir + "/" + params_.filename;
+  fstream f_csv(csv_file.c_str(), ios::out | ios::app);
+
+  f_csv << fixed <<
+  setprecision(6) <<
+  seconds << "," <<
+  latitude << "," <<
+  longitude << "," <<
+  depth << "," <<
+  (float)msg->concentration_ppb << "," <<
+  msg->concentration_raw << "," <<
+  -1 <<  endl;
+
+  f_csv.close();
+
+  /* lauv-xplore-1, Cyclops7, Rhodamine, 1 Hz
+  % 22/06/2015 11:52
+  % Not valid value (-1)
+  % Time (seconds), Latitude (degrees), Longitude (degrees),Depth (meters), Rhodamine (ppb),Rhodamine (raw), Temperature (Celsius)*/
+}
+
+
 void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   IMC::EstimatedState imc_msg;
   imc_msg.setSource(auv_id_);
@@ -86,6 +124,7 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   // NED origin
   imc_msg.lat = msg->origin.latitude*M_PI/180.0;
   imc_msg.lon = msg->origin.longitude*M_PI/180.0;
+
   imc_msg.height = 0;
 
   // Offset WRT NED origin
@@ -127,6 +166,5 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   if (!nav_sts_received_) {
     nav_sts_received_ = true;
   }
-
   estimated_state_pub_.publish(imc_msg);
 }

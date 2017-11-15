@@ -3,6 +3,7 @@ project(turbot_imc_broker)
 
 find_package(catkin REQUIRED COMPONENTS
   auv_msgs
+  cyclops_rhodamine_ros
   ros_imc_broker
   roscpp
   tf
@@ -10,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS auv_msgs ros_imc_broker roscpp tf
+  CATKIN_DEPENDS auv_msgs cyclops_rhodamine_ros ros_imc_broker roscpp tf
 )
 
 include_directories(

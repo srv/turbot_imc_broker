@@ -22,28 +22,64 @@
 
 #include <ros/ros.h>
 #include <auv_msgs/NavSts.h>
+#include <cyclops_rhodamine_ros/Rhodamine.h>
+#include <string>
+#include <fstream>
+
+using namespace std;
+
 
 class TurbotIMCBroker {
  public:
+
+  struct Params
+  {
+    string outdir;            //!> Output directory
+    string filename;
+    // Default settings
+    Params () {
+      outdir            = "";
+      filename          = "";
+      }
+  };
+
+  inline void setParams(const Params& params){params_ = params;}
+
+
   TurbotIMCBroker();
+
 
  protected:
   // Callbacks
   void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
   void AnnounceTimer(const ros::TimerEvent&);
+  void RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg);
+
 
  private:
+
+  Params params_; //!> Stores parameters.
   ros::Publisher estimated_state_pub_;
   ros::Publisher announce_pub_;
   ros::Publisher heartbeat_pub_;
 
   ros::Subscriber nav_sts_sub_;
+<<<<<<< HEAD
 
+=======
+  ros::Publisher rhodamine_pub_;
+  ros::Subscriber rhodamine_sub_;
+>>>>>>> 2cb89bfe36d5850d34ad516d9a86af0ad2575e44
   ros::Timer announce_timer_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
+<<<<<<< HEAD
   int auv_id_;
   int entity_id_;
   std::string system_name_;
+=======
+
+   
+>>>>>>> 2cb89bfe36d5850d34ad516d9a86af0ad2575e44
 };
