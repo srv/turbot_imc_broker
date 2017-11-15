@@ -35,9 +35,15 @@ class TurbotIMCBroker {
  private:
   ros::Publisher estimated_state_pub_;
   ros::Publisher announce_pub_;
+  ros::Publisher heartbeat_pub_;
+
   ros::Subscriber nav_sts_sub_;
+
   ros::Timer announce_timer_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
+  int auv_id_;
+  int entity_id_;
+  std::string system_name_;
 };

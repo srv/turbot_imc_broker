@@ -1,5 +1,10 @@
 <launch>
 
+  <param name="use_sim_time" value="true"/>
+
+  <arg name="bagfile" default="$(env HOME)/bagfiles/valldemossa_night_170717_2130_cut.bag"/>
+  <node name="player" pkg="rosbag" type="play" args="--clock $(arg bagfile)"/>
+
   <node pkg="ros_imc_broker" type="ros_imc_broker_node" name="ros_imc_broker_node" output="screen">
     <param name="server_addr" value="127.0.0.1"/>
     <param name="server_port" value="32603"/>

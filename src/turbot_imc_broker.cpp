@@ -32,35 +32,57 @@
 // IMC messages to use: classes will be IMC::MessageType
 #include <IMC/Spec/EstimatedState.hpp>
 #include <IMC/Spec/Announce.hpp>
+#include <IMC/Spec/Heartbeat.hpp>
 
 TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   ros::NodeHandle nhp("~");
 
+  nhp.param("auv_id", auv_id_, 0x1A);
+  nhp.param("entity_id", entity_id_, 255);  // LSTS said
+  nhp.param<std::string>("system_name", system_name_, std::string("turbot-auv"));
+
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nhp.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
+  heartbeat_pub_ = nhp.advertise<IMC::Heartbeat>("/IMC/Out/Heartbeat", 100);
   announce_pub_ = nhp.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
 
   // Subscribe to ROS or IMC/In messages
   nav_sts_sub_ = nhp.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
 
   // Create timers
-  announce_timer_ = nhp.createTimer(ros::Duration(0.1), &TurbotIMCBroker::AnnounceTimer, this);
+  announce_timer_ = nhp.createTimer(ros::Duration(1), &TurbotIMCBroker::AnnounceTimer, this);
 }
 
 void TurbotIMCBroker::AnnounceTimer(const ros::TimerEvent&) {
   if (!nav_sts_received_) return;
   IMC::Announce announce_msg;
-  announce_msg.sys_name = "turbot-auv";
+  announce_msg.setSource(auv_id_);
+  announce_msg.setSourceEntity(entity_id_);
+  announce_msg.setTimeStamp(ros::Time::now().toSec());
+  announce_msg.sys_name = system_name_;
   announce_msg.sys_type = IMC::SYSTEMTYPE_UUV;
-  announce_msg.owner = 0;  // ?
+  announce_msg.owner = 0xFFFF;  // ?
   announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
   announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
-  announce_msg.height = 0;
+  announce_msg.height = -nav_sts_.position.depth;
+  //TODO announce services info:
+  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://10.0.10.80:6002";
   announce_pub_.publish(announce_msg);
+
+  // Tell we are alive
+  IMC::Heartbeat heartbeat_msg;
+  heartbeat_msg.setSource(auv_id_);
+  heartbeat_msg.setSourceEntity(entity_id_);
+  heartbeat_msg.setTimeStamp(announce_msg.getTimeStamp());
+  heartbeat_pub_.publish(heartbeat_msg);
 }
 
 void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   IMC::EstimatedState imc_msg;
+  imc_msg.setSource(auv_id_);
+  imc_msg.setSourceEntity(entity_id_);
+  imc_msg.setTimeStamp(ros::Time::now().toSec());
+
   // NED origin
   imc_msg.lat = msg->origin.latitude*M_PI/180.0;
   imc_msg.lon = msg->origin.longitude*M_PI/180.0;
