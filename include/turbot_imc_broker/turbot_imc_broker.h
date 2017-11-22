@@ -44,8 +44,8 @@ class TurbotIMCBroker {
       outdir            = "/tmp";
       filename          = "rhodamine.csv";
       system_name       = "turbot";
-      auv_id            = 0x2000;
-      entity_id         = 0xFF;
+      auv_id            = 0x2000; // 8192 turbot identifier
+      entity_id         = 0xFF; // 255 turbot identifier
       }
   };
 
@@ -68,6 +68,7 @@ class TurbotIMCBroker {
   ros::Publisher estimated_state_pub_;
   ros::Publisher announce_pub_;
   ros::Publisher heartbeat_pub_;
+  ros::Publisher vehicle_state_pub_;
 
   ros::Subscriber nav_sts_sub_;
   ros::Publisher rhodamine_pub_;

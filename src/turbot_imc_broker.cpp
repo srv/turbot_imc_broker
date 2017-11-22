@@ -33,6 +33,10 @@
 #include <IMC/Spec/EstimatedState.hpp>
 #include <IMC/Spec/Announce.hpp>
 #include <IMC/Spec/Heartbeat.hpp>
+#include <IMC/Spec/RhodamineDye.hpp>
+#include <IMC/Spec/VehicleState.hpp>
+
+
 
 TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   ros::NodeHandle nh("~");
@@ -48,6 +52,7 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   heartbeat_pub_ = nh.advertise<IMC::Heartbeat>("/IMC/Out/Heartbeat", 100);
   announce_pub_ = nh.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
   rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
+  vehicle_state_pub_ = nh.advertise<IMC::VehicleState>("/IMC/Out/VehicleState", 100);
 
   // TODO IMC messages:
   //  - VehicleState:  periodic, vehicle sent, 1s
@@ -95,6 +100,31 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   heartbeat_msg.setSourceEntity(params_.entity_id);
   heartbeat_msg.setTimeStamp(announce_msg.getTimeStamp());
   heartbeat_pub_.publish(heartbeat_msg);
+
+  IMC::VehicleState vehicle_state_msg;
+  
+  vehicle_state_msg.setSource(params_.auv_id);
+  vehicle_state_msg.setSourceEntity(params_.entity_id);
+  vehicle_state_msg.setTimeStamp(ros::Time::now().toSec());
+  vehicle_state_msg.op_mode=0;
+  vehicle_state_msg.error_count=10;
+  vehicle_state_msg.error_ents="kk de la vaca flaca";
+    //! Maneuver -- Type.
+  vehicle_state_msg.maneuver_type=0;  
+    //! Maneuver -- Start Time.
+  vehicle_state_msg.maneuver_stime=0;  
+    //! Maneuver -- ETA.
+  vehicle_state_msg.maneuver_eta=65535;  
+    //! Control Loops.
+  vehicle_state_msg.control_loops=0;  
+    //! Flags.
+  vehicle_state_msg.flags=1;  
+    //! Last Error -- Description.
+  vehicle_state_msg.last_error="kk de la vaca flaca";  
+    //! Last Error -- Time. 
+  vehicle_state_msg.last_error_time=0;  
+  vehicle_state_pub_.publish(vehicle_state_msg);
+
 }
 
 void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
