@@ -108,7 +108,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   vehicle_state_msg.setTimeStamp(ros::Time::now().toSec());
   vehicle_state_msg.op_mode=0;
   vehicle_state_msg.error_count=10;
-  vehicle_state_msg.error_ents="kk de la vaca flaca";
+  vehicle_state_msg.error_ents="no error";
     //! Maneuver -- Type.
   vehicle_state_msg.maneuver_type=0;  
     //! Maneuver -- Start Time.
@@ -120,7 +120,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
     //! Flags.
   vehicle_state_msg.flags=1;  
     //! Last Error -- Description.
-  vehicle_state_msg.last_error="kk de la vaca flaca";  
+  vehicle_state_msg.last_error="no error";  
     //! Last Error -- Time. 
   vehicle_state_msg.last_error_time=0;  
   vehicle_state_pub_.publish(vehicle_state_msg);
