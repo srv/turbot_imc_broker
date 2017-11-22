@@ -38,7 +38,7 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   ros::NodeHandle nh("~");
 
   nh.param("auv_id", params_.auv_id, 0x2000);
-  nh.param("entity_id", params_.entity_id, 0xFF);  // LSTS said
+  nh.param("entity_id", params_.entity_id, 0xFF);  // LSTS said 255
   nh.param<std::string>("system_name", params_.system_name, std::string("turbot"));
   nh.param<std::string>("outdir", params_.outdir, std::string("/tmp"));
   nh.param<std::string>("filename", params_.filename, std::string("rhodamine.csv"));
@@ -47,17 +47,17 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   heartbeat_pub_ = nh.advertise<IMC::Heartbeat>("/IMC/Out/Heartbeat", 100);
   announce_pub_ = nh.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
-  rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 1);
+  rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
 
   // TODO IMC messages:
   //  - VehicleState:  periodic, vehicle sent, 1s
   //  - PlanControl: Neptus sent, used to start and stop a plan, and send quick
-  //    plans to a vehicle
+  //    plans to a vehicle (goto or Station keeping)
   //  - Abort: Neptus sent, used in case of emergency to stop all activity on
   //    the vehicle
-  //  - PlanControlState: periodic, send by vehicle, 1s
+  //  - PlanControlState: periodic, send by vehicle, 1s, percentage of mission remaining
   //  - PlanDB: query by Neptus, used to interact with the vehicle, there are
-  //    internal IMC messages used that is described on the definition of the
+  //    internal IMC messages used that  are described on the definition of the
   //    PlanDB message
   //  - PlanSpecification: Mission plans. The following parameters can be
   //    ignored: Namespace, Plan Variables, Start Actions, End Actions. A plan
@@ -69,7 +69,7 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
 
   // Subscribe to ROS or IMC/In messages
   nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
-  rhodamine_sub_ = nh.subscribe("/cyclops_rhodamine_ros/Rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
+  rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
 
   // Create timers
   timer_ = nh.createTimer(ros::Duration(1), &TurbotIMCBroker::Timer, this);
