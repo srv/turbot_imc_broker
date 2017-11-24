@@ -35,10 +35,14 @@
 #include <IMC/Spec/Heartbeat.hpp>
 #include <IMC/Spec/RhodamineDye.hpp>
 #include <IMC/Spec/VehicleState.hpp>
+#include <IMC/Spec/PlanControlState.hpp>
+#include <IMC/Spec/PlanControlState.hpp>
 
 
 
-TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
+TurbotIMCBroker::TurbotIMCBroker() :
+        nav_sts_received_(false),
+        is_plan_loaded_(true) {
   ros::NodeHandle nh("~");
 
   nh.param("auv_id", params_.auv_id, 0x2000);
@@ -53,6 +57,7 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   announce_pub_ = nh.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
   rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
   vehicle_state_pub_ = nh.advertise<IMC::VehicleState>("/IMC/Out/VehicleState", 100);
+  plan_control_state_pub_ = nh.advertise<IMC::PlanControlState>("/IMC/Out/PlanControlState", 100);
 
   // TODO IMC messages:
   //  - VehicleState:  periodic, vehicle sent, 1s
@@ -73,8 +78,21 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false) {
   //    - Station keeping
 
   // Subscribe to ROS or IMC/In messages
+#ifdef UIB
   nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+#endif
+#ifdef UIB
+  nav_sts_sub_ = nh.subscribe("/cola2_navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+#endif
+
   rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
+
+#ifdef UDG
+  plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1 , &TurbotIMCBroker::CaptainStatusCallback, this);
+#endif
+#ifdef UIB
+  plan_status_sub_ = nh.subscribe("control/mission_status", 1 , &TurbotIMCBroker::MissionStatusCallback, this);
+#endif
 
   // Create timers
   timer_ = nh.createTimer(ros::Duration(1), &TurbotIMCBroker::Timer, this);
@@ -126,6 +144,98 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   vehicle_state_pub_.publish(vehicle_state_msg);
 
 }
+
+#ifdef UDG
+void TurbotIMCBroker::CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg) {
+  IMC::PlanControlState plan_control_state;
+  plan_control_state.setSource(params_.auv_id);
+  plan_control_state.setSourceEntity(params_.entity_id);
+  plan_control_state.setTimeStamp(ros::Time::now().toSec());
+
+  // Default values
+  plan_control_state.plan_eta = 0;
+  plan_control_state.plan_progress = 0;
+  plan_control_state.man_id = "";
+  // plan_control_state.man_id ??;
+  plan_control_state.man_eta = -1;
+
+  if (msg.mission_active) { // A plan is under execution
+    plan_control_state.state = IMC::PlanControlState::PCS_EXECUTING;
+    plan_control_state.plan_eta = msg.total_steps * TIME_PER_MISSION_STEP;
+    plan_control_state.plan_progress = int((float(msg.current_step)/float(msg.total_steps))*100);
+    plan_control_state.man_id = std::to_string(msg.current_step);
+    // plan_control_state.man_id ??;
+    plan_control_state.man_eta = -1;
+  }
+  else { // No plan under execution ...
+    if (msg.active_controller == 0) { // ... and no actions are being executed ...
+      if (is_plan_loaded_) { // ... and a plan is loaded.
+        plan_control_state.state = IMC::PlanControlState::PCS_READY;
+      }
+      else { // ... and no plan is loaded.
+        plan_control_state.state = IMC::PlanControlState::PCS_BLOCKED;
+      }
+    }
+    else { // ... but an action (goto, keep position, ...) is under execution
+      plan_control_state.state = IMC::PlanControlState::PCS_BLOCKED;
+    }
+  }
+
+  if (is_plan_loaded_) {
+    plan_control_state.plan_id = "last_plan";
+  }
+  else {
+    plan_control_state.plan_id = "";
+  }
+
+  plan_control_state.last_outcome = plan_control_state.state;
+  plan_control_state_pub_.publish(plan_control_state);
+}
+#endif
+
+#ifdef UIB
+void TurbotIMCBroker::MissionStatusCallback(const cola2_msgs::MissionStatus& msg) {
+  IMC::PlanControlState plan_control_state;
+  plan_control_state.setSource(params_.auv_id);
+  plan_control_state.setSourceEntity(params_.entity_id);
+  plan_control_state.setTimeStamp(ros::Time::now().toSec());
+
+  // Default values
+  plan_control_state.plan_eta = 0;
+  plan_control_state.plan_progress = 0;
+  plan_control_state.man_id = "";
+  // plan_control_state.man_id ??;
+  plan_control_state.man_eta = -1;
+
+  if (msg.current_wp > 0) { // A plan is under execution
+    plan_control_state.state = IMC::PlanControlState::PCS_EXECUTING;
+    plan_control_state.plan_eta = msg.total_wp * TIME_PER_MISSION_STEP;
+    plan_control_state.plan_progress = int((float(msg.current_wp)/float(msg.total_wp))*100);
+    plan_control_state.man_id = std::to_string(msg.current_wp);
+    // plan_control_state.man_id ??;
+    plan_control_state.man_eta = -1;
+  }
+  else { // No plan under execution ...
+    if (is_plan_loaded_) { // ... and a plan is loaded.
+      plan_control_state.state = IMC::PlanControlState::PCS_READY;
+    }
+    else { // ... and no plan is loaded.
+      plan_control_state.state = IMC::PlanControlState::PCS_BLOCKED;
+    }
+  }
+
+  if (is_plan_loaded_) {
+    plan_control_state.plan_id = "last_plan";
+  }
+  else {
+    plan_control_state.plan_id = "";
+  }
+
+  plan_control_state.last_outcome = plan_control_state.state;
+  plan_control_state_pub_.publish(plan_control_state);
+}
+#endif
+
 
 void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
   // publish rhodamine message

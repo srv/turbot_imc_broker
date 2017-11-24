@@ -23,8 +23,21 @@
 #include <ros/ros.h>
 #include <auv_msgs/NavSts.h>
 #include <cyclops_rhodamine_ros/Rhodamine.h>
+
 #include <string>
 #include <fstream>
+
+// #define UDG
+#define UIB
+
+#ifdef UDG
+#include <cola2_msgs/CaptainStatus.h>
+#endif
+#ifdef UIB
+#include <cola2_msgs/MissionStatus.h>
+#endif
+
+#define TIME_PER_MISSION_STEP   100
 
 using namespace std;
 
@@ -60,8 +73,12 @@ class TurbotIMCBroker {
   void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
   void Timer(const ros::TimerEvent&);
   void RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg);
-
-
+#ifdef UDG
+  void CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg);
+#endif
+#ifdef UIB
+    void MissionStatusCallback(const cola2_msgs::MissionStatus& msg);
+#endif
  private:
 
   Params params_; //!> Stores parameters.
@@ -69,12 +86,15 @@ class TurbotIMCBroker {
   ros::Publisher announce_pub_;
   ros::Publisher heartbeat_pub_;
   ros::Publisher vehicle_state_pub_;
+  ros::Publisher plan_control_state_pub_;
 
   ros::Subscriber nav_sts_sub_;
   ros::Publisher rhodamine_pub_;
   ros::Subscriber rhodamine_sub_;
+  ros::Subscriber plan_status_sub_;
   ros::Timer timer_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
+  bool is_plan_loaded_;
 };
