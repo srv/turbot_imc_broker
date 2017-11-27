@@ -97,7 +97,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
   announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
   announce_msg.height = -nav_sts_.position.depth;
-  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://10.0.10.80:6002;imc+tcp://10.0.10.80:32603";
+  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://192.168.2.104:6002;imc+tcp://192.168.2.104:32603";
   announce_pub_.publish(announce_msg);
 
   // Tell we are alive
