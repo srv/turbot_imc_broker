@@ -36,8 +36,6 @@
 #include <IMC/Spec/RhodamineDye.hpp>
 #include <IMC/Spec/VehicleState.hpp>
 #include <IMC/Spec/PlanControlState.hpp>
-#include <IMC/Spec/PlanControlState.hpp>
-
 
 
 TurbotIMCBroker::TurbotIMCBroker() :
