@@ -2,7 +2,7 @@
 
   <param name="use_sim_time" value="true"/>
 
-  <arg name="bagfile" default="$(env HOME)/bagfiles/valldemossa_night_170717_2130_cut.bag"/>
+  <arg name="bagfile" default="/home/xesc/BAGFILES_BAG/emisari_27092017/auv170927_1234_2017-09-27-10-34-47_0.bag"/>
   <node name="player" pkg="rosbag" type="play" args="--clock $(arg bagfile)"/>
 
   <node pkg="ros_imc_broker" type="ros_imc_broker_node" name="ros_imc_broker_node" output="screen">

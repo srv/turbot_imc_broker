@@ -34,7 +34,7 @@
 #include <cola2_msgs/CaptainStatus.h>
 #endif
 #ifdef UIB
-#include <cola2_msgs/MissionStatus.h>
+#include <safety/MissionStatus.h>
 #endif
 
 #define TIME_PER_MISSION_STEP   100
@@ -44,7 +44,7 @@ using namespace std;
 
 class TurbotIMCBroker {
  public:
-
+  
   struct Params
   {
     std::string outdir;        //!> Output directory
@@ -77,7 +77,7 @@ class TurbotIMCBroker {
   void CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg);
 #endif
 #ifdef UIB
-    void MissionStatusCallback(const cola2_msgs::MissionStatus& msg);
+    void MissionStatusCallback(const safety::MissionStatus& msg);
 #endif
  private:
 
@@ -97,4 +97,5 @@ class TurbotIMCBroker {
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
   bool is_plan_loaded_;
+  int m_eta;
 };
