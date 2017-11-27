@@ -24,11 +24,6 @@
 
 #include <tf/tf.h>
 
-// Base IMC template
-#include <ros_imc_broker/ImcTypes.hpp>
-#include <IMC/Base/Packet.hpp>
-#include <IMC/Spec/AllMessages.hpp>
-
 // IMC messages to use: classes will be IMC::MessageType
 #include <IMC/Spec/EstimatedState.hpp>
 #include <IMC/Spec/Announce.hpp>
@@ -36,8 +31,6 @@
 #include <IMC/Spec/RhodamineDye.hpp>
 #include <IMC/Spec/VehicleState.hpp>
 #include <IMC/Spec/PlanControlState.hpp>
-#include <IMC/Spec/PlanControlState.hpp>
-
 
 
 TurbotIMCBroker::TurbotIMCBroker() :
@@ -78,20 +71,17 @@ TurbotIMCBroker::TurbotIMCBroker() :
   //    - Station keeping
 
   // Subscribe to ROS or IMC/In messages
+  abort_sub_ = nh.subscribe("/IMC/In/Abort", 1, &TurbotIMCBroker::AbortCallback, this);
+  plan_db_sub_ = nh.subscribe("/IMC/In/PlanDB", 1, &TurbotIMCBroker::PlanDBCallback, this);
+  plan_control_sub_ = nh.subscribe("/IMC/In/PlanControl", 1, &TurbotIMCBroker::PlanControlCallback, this);
+  rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
 #ifdef UIB
   nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+  plan_status_sub_ = nh.subscribe("/control/mission_status", 1 , &TurbotIMCBroker::MissionStatusCallback, this);
 #endif
 #ifdef UDG
   nav_sts_sub_ = nh.subscribe("/cola2_navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
-#endif
-
-  rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
-
-#ifdef UDG
   plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1 , &TurbotIMCBroker::CaptainStatusCallback, this);
-#endif
-#ifdef UIB
-  plan_status_sub_ = nh.subscribe("/control/mission_status", 1 , &TurbotIMCBroker::MissionStatusCallback, this);
 #endif
 
   // Create timers
@@ -109,7 +99,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
   announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
   announce_msg.height = -nav_sts_.position.depth;
-  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://10.0.10.80:6002";
+  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://10.0.10.80:6002;imc+tcp://10.0.10.80:32603";
   announce_pub_.publish(announce_msg);
 
   // Tell we are alive
@@ -120,7 +110,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   heartbeat_pub_.publish(heartbeat_msg);
 
   IMC::VehicleState vehicle_state_msg;
-  
+
   vehicle_state_msg.setSource(params_.auv_id);
   vehicle_state_msg.setSourceEntity(params_.entity_id);
   vehicle_state_msg.setTimeStamp(ros::Time::now().toSec());
@@ -128,25 +118,25 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
     vehicle_state_msg.op_mode=3;
   }
   else{
-    vehicle_state_msg.op_mode=0; // else, the vehicle is in op.=SERVICE (ready to service request) 
+    vehicle_state_msg.op_mode=0; // else, the vehicle is in op.=SERVICE (ready to service request)
   }
   // still to define how to capture an error .....
   vehicle_state_msg.error_count=0;
   vehicle_state_msg.error_ents="no error";
     //! Maneuver -- Type.
-  vehicle_state_msg.maneuver_type=0;  
+  vehicle_state_msg.maneuver_type=0;
     //! Maneuver -- Start Time.
-  vehicle_state_msg.maneuver_stime=0;  
+  vehicle_state_msg.maneuver_stime=0;
     //! Maneuver -- ETA.
-  vehicle_state_msg.maneuver_eta=m_eta;  
+  vehicle_state_msg.maneuver_eta=m_eta;
     //! Control Loops.
-  vehicle_state_msg.control_loops=0;  
+  vehicle_state_msg.control_loops=0;
     //! Flags.
-  vehicle_state_msg.flags=1;  
+  vehicle_state_msg.flags=1;
     //! Last Error -- Description.
-  vehicle_state_msg.last_error="no error";  
-    //! Last Error -- Time. 
-  vehicle_state_msg.last_error_time=0;  
+  vehicle_state_msg.last_error="no error";
+    //! Last Error -- Time.
+  vehicle_state_msg.last_error_time=0;
   vehicle_state_pub_.publish(vehicle_state_msg);
 
 }
@@ -326,4 +316,16 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
     nav_sts_received_ = true;
   }
   estimated_state_pub_.publish(imc_msg);
+}
+
+void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
+  ROS_INFO("IMC::PlanDB message received!");
+}
+
+void TurbotIMCBroker::PlanControlCallback(const IMC::PlanControl& msg) {
+  ROS_INFO("IMC::PlanControl message received!");
+}
+
+void TurbotIMCBroker::AbortCallback(const IMC::Abort& msg) {
+  ROS_INFO("IMC::Abort message received!");
 }
