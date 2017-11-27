@@ -81,7 +81,7 @@ TurbotIMCBroker::TurbotIMCBroker() :
 #ifdef UIB
   nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
 #endif
-#ifdef UIB
+#ifdef UDG
   nav_sts_sub_ = nh.subscribe("/cola2_navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
 #endif
 
