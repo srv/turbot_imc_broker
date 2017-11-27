@@ -126,9 +126,13 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   vehicle_state_msg.setTimeStamp(ros::Time::now().toSec());
   if (is_plan_loaded_) { // if plan is loaded, op. mode= MANEUVER (a maneuver is executing)
     vehicle_state_msg.op_mode=3;
+     //! Maneuver -- ETA.
+    vehicle_state_msg.maneuver_eta=m_eta;  
   }
   else{
     vehicle_state_msg.op_mode=0; // else, the vehicle is in op.=SERVICE (ready to service request) 
+     //! Maneuver -- ETA.
+    vehicle_state_msg.maneuver_eta=65535; // value when no maneuver   
   }
   // still to define how to capture an error .....
   vehicle_state_msg.error_count=0;
@@ -137,12 +141,11 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   vehicle_state_msg.maneuver_type=0;  
     //! Maneuver -- Start Time.
   vehicle_state_msg.maneuver_stime=0;  
-    //! Maneuver -- ETA.
-  vehicle_state_msg.maneuver_eta=m_eta;  
+   
     //! Control Loops.
-  vehicle_state_msg.control_loops=0;  
+  vehicle_state_msg.control_loops=0x00000000;  // no use
     //! Flags.
-  vehicle_state_msg.flags=1;  
+  vehicle_state_msg.flags=0x00; //0x01 when the maneuver is done, 0 elsewhere  
     //! Last Error -- Description.
   vehicle_state_msg.last_error="no error";  
     //! Last Error -- Time. 
