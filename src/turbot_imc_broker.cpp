@@ -31,6 +31,11 @@
 #include <IMC/Spec/RhodamineDye.hpp>
 #include <IMC/Spec/VehicleState.hpp>
 #include <IMC/Spec/PlanControlState.hpp>
+#include <IMC/Spec/PlanSpecification.hpp>
+#include <IMC/Spec/PlanManeuver.hpp>
+#include <IMC/Spec/Goto.hpp>
+#include <IMC/Spec/StationKeeping.hpp>
+#include <IMC/Spec/FollowPath.hpp>
 
 
 TurbotIMCBroker::TurbotIMCBroker() :
@@ -97,7 +102,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
   announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
   announce_msg.height = -nav_sts_.position.depth;
-  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://192.168.2.104:6002;imc+tcp://192.168.2.104:32603";
+  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://192.168.1.199:6002;imc+tcp://192.168.1.199:32603";
   announce_pub_.publish(announce_msg);
 
   // Tell we are alive
@@ -320,12 +325,61 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
 
 void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
   ROS_INFO("IMC::PlanDB message received!");
+
+  if (msg.op == IMC::PlanDB::DBOP_SET) {
+    //! Example of possible implementation. NOT TESTED!
+    const IMC::Message* cmsg = msg.arg.get();
+    IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
+    IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
+    IMC::MessageList<IMC::PlanManeuver>::const_iterator it;
+    for (it = plan_specification->maneuvers.begin();
+         it != plan_specification->maneuvers.end(); it++) {
+      // Each plan_specification->maneuvers[i] is a PlanManeuver
+      IMC::Maneuver* maneuver_msg = (*it)->data.get();
+      if (maneuver_msg->getName() == "Goto") {
+        IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
+        // Handle Goto maneuver
+      } else if (maneuver_msg->getName() == "FollowPath") {
+        IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
+        // Handle FollowPath maneuver
+      } else if (maneuver_msg->getName() == "StationKeeping") {
+        IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
+        // Handle StationKeeping maneuver
+      }
+    }
+  } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
+    // Should delete a record
+  } else if (msg.op == IMC::PlanDB::DBOP_GET) {
+    // Should return PlanSpecification
+  } else if (msg.op == IMC::PlanDB::DBOP_GET_INFO) {
+    // Should return PlanDBInformation
+  } else if (msg.op == IMC::PlanDB::DBOP_CLEAR) {
+    // Should delete all DB records
+  } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
+    // Should return PlanDbState
+  } else {
+    ROS_INFO("IMC::PlanDB operation not implemented");
+  }
 }
 
 void TurbotIMCBroker::PlanControlCallback(const IMC::PlanControl& msg) {
   ROS_INFO("IMC::PlanControl message received!");
+
+  if (msg.op == IMC::PlanControl::PC_START) {
+    //! Start Plan.
+  } else if (msg.op == IMC::PlanControl::PC_STOP) {
+    //! Stop Plan.
+  } else if (msg.op == IMC::PlanControl::PC_LOAD) {
+    //! Load Plan.
+  } else if (msg.op == IMC::PlanControl::PC_GET) {
+    //! Get Plan.
+  } else {
+    ROS_INFO("IMC::PlanControl operation not implemented");
+  }
 }
 
 void TurbotIMCBroker::AbortCallback(const IMC::Abort& msg) {
   ROS_INFO("IMC::Abort message received!");
+
+  //! Stop mission and disable thrusters
 }
