@@ -24,11 +24,20 @@
 #include <auv_msgs/NavSts.h>
 #include <cyclops_rhodamine_ros/Rhodamine.h>
 
+// Base IMC template
+#include <ros_imc_broker/ImcTypes.hpp>
+#include <IMC/Base/Packet.hpp>
+#include <IMC/Spec/AllMessages.hpp>
+// Subscribers
+#include <IMC/Spec/PlanControl.hpp>
+#include <IMC/Spec/PlanDB.hpp>
+#include <IMC/Spec/Abort.hpp>
+
 #include <string>
 #include <fstream>
 
 // #define UDG
-#define UIB
+// #define UIB
 
 #ifdef UDG
 #include <cola2_msgs/CaptainStatus.h>
@@ -44,7 +53,7 @@ using namespace std;
 
 class TurbotIMCBroker {
  public:
-  
+
   struct Params
   {
     std::string outdir;        //!> Output directory
@@ -73,6 +82,9 @@ class TurbotIMCBroker {
   void NavStsCallback(const auv_msgs::NavStsConstPtr& msg);
   void Timer(const ros::TimerEvent&);
   void RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg);
+  void PlanDBCallback(const IMC::PlanDB& msg);
+  void PlanControlCallback(const IMC::PlanControl& msg);
+  void AbortCallback(const IMC::Abort& msg);
 #ifdef UDG
   void CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg);
 #endif
@@ -82,16 +94,21 @@ class TurbotIMCBroker {
  private:
 
   Params params_; //!> Stores parameters.
+  // Publishers
   ros::Publisher estimated_state_pub_;
   ros::Publisher announce_pub_;
   ros::Publisher heartbeat_pub_;
   ros::Publisher vehicle_state_pub_;
   ros::Publisher plan_control_state_pub_;
-
-  ros::Subscriber nav_sts_sub_;
   ros::Publisher rhodamine_pub_;
+  // Subscribers
+  ros::Subscriber nav_sts_sub_;
   ros::Subscriber rhodamine_sub_;
   ros::Subscriber plan_status_sub_;
+  ros::Subscriber plan_db_sub_;
+  ros::Subscriber plan_control_sub_;
+  ros::Subscriber abort_sub_;
+  // Timers
   ros::Timer timer_;
 
   auv_msgs::NavSts nav_sts_;

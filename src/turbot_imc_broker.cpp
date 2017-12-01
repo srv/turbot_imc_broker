@@ -24,11 +24,6 @@
 
 #include <tf/tf.h>
 
-// Base IMC template
-#include <ros_imc_broker/ImcTypes.hpp>
-#include <IMC/Base/Packet.hpp>
-#include <IMC/Spec/AllMessages.hpp>
-
 // IMC messages to use: classes will be IMC::MessageType
 #include <IMC/Spec/EstimatedState.hpp>
 #include <IMC/Spec/Announce.hpp>
@@ -36,6 +31,11 @@
 #include <IMC/Spec/RhodamineDye.hpp>
 #include <IMC/Spec/VehicleState.hpp>
 #include <IMC/Spec/PlanControlState.hpp>
+#include <IMC/Spec/PlanSpecification.hpp>
+#include <IMC/Spec/PlanManeuver.hpp>
+#include <IMC/Spec/Goto.hpp>
+#include <IMC/Spec/StationKeeping.hpp>
+#include <IMC/Spec/FollowPath.hpp>
 
 
 TurbotIMCBroker::TurbotIMCBroker() :
@@ -58,12 +58,10 @@ TurbotIMCBroker::TurbotIMCBroker() :
   plan_control_state_pub_ = nh.advertise<IMC::PlanControlState>("/IMC/Out/PlanControlState", 100);
 
   // TODO IMC messages:
-  //  - VehicleState:  periodic, vehicle sent, 1s
   //  - PlanControl: Neptus sent, used to start and stop a plan, and send quick
   //    plans to a vehicle (goto or Station keeping)
   //  - Abort: Neptus sent, used in case of emergency to stop all activity on
   //    the vehicle
-  //  - PlanControlState: periodic, send by vehicle, 1s, percentage of mission remaining
   //  - PlanDB: query by Neptus, used to interact with the vehicle, there are
   //    internal IMC messages used that  are described on the definition of the
   //    PlanDB message
@@ -76,20 +74,17 @@ TurbotIMCBroker::TurbotIMCBroker() :
   //    - Station keeping
 
   // Subscribe to ROS or IMC/In messages
+  abort_sub_ = nh.subscribe("/IMC/In/Abort", 1, &TurbotIMCBroker::AbortCallback, this);
+  plan_db_sub_ = nh.subscribe("/IMC/In/PlanDB", 1, &TurbotIMCBroker::PlanDBCallback, this);
+  plan_control_sub_ = nh.subscribe("/IMC/In/PlanControl", 1, &TurbotIMCBroker::PlanControlCallback, this);
+  rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
 #ifdef UIB
   nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+  plan_status_sub_ = nh.subscribe("/control/mission_status", 1 , &TurbotIMCBroker::MissionStatusCallback, this);
 #endif
 #ifdef UDG
   nav_sts_sub_ = nh.subscribe("/cola2_navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
-#endif
-
-  rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
-
-#ifdef UDG
   plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1 , &TurbotIMCBroker::CaptainStatusCallback, this);
-#endif
-#ifdef UIB
-  plan_status_sub_ = nh.subscribe("/control/mission_status", 1 , &TurbotIMCBroker::MissionStatusCallback, this);
 #endif
 
   // Create timers
@@ -107,7 +102,7 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
   announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
   announce_msg.height = -nav_sts_.position.depth;
-  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://10.0.10.80:6002";
+  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://192.168.1.199:6002;imc+tcp://192.168.1.199:32603";
   announce_pub_.publish(announce_msg);
 
   // Tell we are alive
@@ -118,36 +113,35 @@ void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   heartbeat_pub_.publish(heartbeat_msg);
 
   IMC::VehicleState vehicle_state_msg;
-  
+
   vehicle_state_msg.setSource(params_.auv_id);
   vehicle_state_msg.setSourceEntity(params_.entity_id);
   vehicle_state_msg.setTimeStamp(ros::Time::now().toSec());
   if (is_plan_loaded_) { // if plan is loaded, op. mode= MANEUVER (a maneuver is executing)
     vehicle_state_msg.op_mode=3;
-     //! Maneuver -- ETA.
-    vehicle_state_msg.maneuver_eta=m_eta;  
+    //! Maneuver -- ETA.
+    vehicle_state_msg.maneuver_eta=m_eta;
   }
   else{
-    vehicle_state_msg.op_mode=0; // else, the vehicle is in op.=SERVICE (ready to service request) 
-     //! Maneuver -- ETA.
-    vehicle_state_msg.maneuver_eta=65535; // value when no maneuver   
+    vehicle_state_msg.op_mode=0; // else, the vehicle is in op.=SERVICE (ready to service request)
+    //! Maneuver -- ETA.
+    vehicle_state_msg.maneuver_eta=65535; // value when no maneuver
   }
   // still to define how to capture an error .....
   vehicle_state_msg.error_count=0;
   vehicle_state_msg.error_ents="no error";
-    //! Maneuver -- Type.
-  vehicle_state_msg.maneuver_type=0;  
-    //! Maneuver -- Start Time.
-  vehicle_state_msg.maneuver_stime=0;  
-   
-    //! Control Loops.
+  //! Maneuver -- Type.
+  vehicle_state_msg.maneuver_type=0;
+  //! Maneuver -- Start Time.
+  vehicle_state_msg.maneuver_stime=0;
+  //! Control Loops.
   vehicle_state_msg.control_loops=0x00000000;  // no use
-    //! Flags.
-  vehicle_state_msg.flags=0x00; //0x01 when the maneuver is done, 0 elsewhere  
-    //! Last Error -- Description.
-  vehicle_state_msg.last_error="no error";  
-    //! Last Error -- Time. 
-  vehicle_state_msg.last_error_time=0;  
+  //! Flags.
+  vehicle_state_msg.flags=0x00; //0x01 when the maneuver is done, 0 elsewhere
+  //! Last Error -- Description.
+  vehicle_state_msg.last_error="no error";
+  //! Last Error -- Time.
+  vehicle_state_msg.last_error_time=0;
   vehicle_state_pub_.publish(vehicle_state_msg);
 
 }
@@ -327,4 +321,65 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
     nav_sts_received_ = true;
   }
   estimated_state_pub_.publish(imc_msg);
+}
+
+void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
+  ROS_INFO("IMC::PlanDB message received!");
+
+  if (msg.op == IMC::PlanDB::DBOP_SET) {
+    //! Example of possible implementation. NOT TESTED!
+    const IMC::Message* cmsg = msg.arg.get();
+    IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
+    IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
+    IMC::MessageList<IMC::PlanManeuver>::const_iterator it;
+    for (it = plan_specification->maneuvers.begin();
+         it != plan_specification->maneuvers.end(); it++) {
+      // Each plan_specification->maneuvers[i] is a PlanManeuver
+      IMC::Maneuver* maneuver_msg = (*it)->data.get();
+      if (maneuver_msg->getName() == "Goto") {
+        IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
+        // Handle Goto maneuver
+      } else if (maneuver_msg->getName() == "FollowPath") {
+        IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
+        // Handle FollowPath maneuver
+      } else if (maneuver_msg->getName() == "StationKeeping") {
+        IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
+        // Handle StationKeeping maneuver
+      }
+    }
+  } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
+    // Should delete a record
+  } else if (msg.op == IMC::PlanDB::DBOP_GET) {
+    // Should return PlanSpecification
+  } else if (msg.op == IMC::PlanDB::DBOP_GET_INFO) {
+    // Should return PlanDBInformation
+  } else if (msg.op == IMC::PlanDB::DBOP_CLEAR) {
+    // Should delete all DB records
+  } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
+    // Should return PlanDbState
+  } else {
+    ROS_INFO("IMC::PlanDB operation not implemented");
+  }
+}
+
+void TurbotIMCBroker::PlanControlCallback(const IMC::PlanControl& msg) {
+  ROS_INFO("IMC::PlanControl message received!");
+
+  if (msg.op == IMC::PlanControl::PC_START) {
+    //! Start Plan.
+  } else if (msg.op == IMC::PlanControl::PC_STOP) {
+    //! Stop Plan.
+  } else if (msg.op == IMC::PlanControl::PC_LOAD) {
+    //! Load Plan.
+  } else if (msg.op == IMC::PlanControl::PC_GET) {
+    //! Get Plan.
+  } else {
+    ROS_INFO("IMC::PlanControl operation not implemented");
+  }
+}
+
+void TurbotIMCBroker::AbortCallback(const IMC::Abort& msg) {
+  ROS_INFO("IMC::Abort message received!");
+
+  //! Stop mission and disable thrusters
 }
