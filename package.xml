@@ -12,17 +12,20 @@
   <build_depend>ros_imc_broker</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>tf</build_depend>
+  <build_depend>safety</build_depend>
   <build_export_depend>auv_msgs</build_export_depend>
   <build_export_depend>cola2_msgs</build_export_depend>
   <build_export_depend>cyclops_rhodamine_ros</build_export_depend>
   <build_export_depend>ros_imc_broker</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>tf</build_export_depend>
+  <build_export_depend>safety</build_export_depend>
   <exec_depend>auv_msgs</exec_depend>
   <exec_depend>cyclops_rhodamine_ros</exec_depend>
   <exec_depend>ros_imc_broker</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>tf</exec_depend>
+  <exec_depend>safety</exec_depend>
   <export>
   </export>
 </package>
