@@ -27,17 +27,17 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh;
   ros::NodeHandle nhp("~");
 
-  #ifdef UIB
-    ROS_INFO("--------------------");
-    ROS_INFO("   UIB is defined   ");
-    ROS_INFO("--------------------");
-  #endif
+  // #ifdef UIB
+  //   ROS_INFO("--------------------");
+  //   ROS_INFO("   UIB is defined   ");
+  //   ROS_INFO("--------------------");
+  // #endif
 
-  #ifdef UDG
-    ROS_INFO("--------------------");
-    ROS_INFO("   UDG is defined   ");
-    ROS_INFO("--------------------");
-  #endif
+  // #ifdef UDG
+  //   ROS_INFO("--------------------");
+  //   ROS_INFO("   UDG is defined   ");
+  //   ROS_INFO("--------------------");
+  // #endif
 
   // Read parameters
   TurbotIMCBroker::Params params;

@@ -326,27 +326,16 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
 void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
   ROS_INFO("IMC::PlanDB message received!");
 
-  if (msg.op == IMC::PlanDB::DBOP_SET) {
+  if (msg.op == IMC::PlanDB::DBOP_SET) { // if planDB operation = 0, then the argument contains a Plan Specification in the structure of a type Message
     //! Example of possible implementation. NOT TESTED!
-    const IMC::Message* cmsg = msg.arg.get();
-    IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
-    IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
-    IMC::MessageList<IMC::PlanManeuver>::const_iterator it;
-    for (it = plan_specification->maneuvers.begin();
-         it != plan_specification->maneuvers.end(); it++) {
-      // Each plan_specification->maneuvers[i] is a PlanManeuver
-      IMC::Maneuver* maneuver_msg = (*it)->data.get();
-      if (maneuver_msg->getName() == "Goto") {
-        IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
-        // Handle Goto maneuver
-      } else if (maneuver_msg->getName() == "FollowPath") {
-        IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
-        // Handle FollowPath maneuver
-      } else if (maneuver_msg->getName() == "StationKeeping") {
-        IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
-        // Handle StationKeeping maneuver
-      }
-    }
+    const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message 
+    IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
+    IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message    
+    mission_.parse(*plan_specification);
+    
+
+
+
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {

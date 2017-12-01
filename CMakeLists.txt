@@ -4,42 +4,49 @@ project(turbot_imc_broker)
 set(UIB ON)
 set(UDG OFF)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  auv_msgs
-  cyclops_rhodamine_ros
-  ros_imc_broker
-  tf
-  safety
-)
+#find_package(catkin REQUIRED COMPONENTS
+#  roscpp
+#  auv_msgs
+#  cyclops_rhodamine_ros
+#  ros_imc_broker
+#  tf
+#)
 
-#if(UIB)
-#  message("------------------")
-#  message("UIB Mode selected!")
-#  message("------------------")
-#   find_package(catkin COMPONENTS
-#    roscpp
-#    auv_msgs
-#    cyclops_rhodamine_ros
-#    ros_imc_broker
-#    tf
-#    safety
-#   )
-#  add_definitions(-DUIB)
-#elseif(UDG)
-#  message("------------------")
-#  message("UdG Mode selected!")
-#  message("------------------")
-#  find_package(catkin COMPONENTS
-#    cola2_msgs
-#  add_definitions(-DUDG)
-#endif(UIB)
+if(UIB)
+  message("------------------")
+  message("UIB Mode selected!")
+  message("------------------")
+   find_package(catkin REQUIRED COMPONENTS
+     roscpp
+     auv_msgs
+     cyclops_rhodamine_ros
+     ros_imc_broker
+     tf
+     safety
+     utils
+   )
+  add_definitions(-DUIB)
+elseif(UDG)
+  message("------------------")
+  message("UdG Mode selected!")
+  message("------------------")
+  find_package(catkin COMPONENTS
+    cola2_msgs
+    roscpp
+    auv_msgs
+    cyclops_rhodamine_ros
+    ros_imc_broker
+    tf
+    utils
+  )
+  add_definitions(-DUDG)
+endif(UIB)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 catkin_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS auv_msgs cyclops_rhodamine_ros ros_imc_broker roscpp tf safety
+  CATKIN_DEPENDS auv_msgs safety cyclops_rhodamine_ros ros_imc_broker roscpp tf
 )
 
 include_directories(

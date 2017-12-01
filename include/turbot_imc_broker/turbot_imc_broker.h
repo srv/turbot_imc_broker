@@ -35,9 +35,11 @@
 
 #include <string>
 #include <fstream>
+#include <turbot_imc_broker/mission.h>
+
 
 // #define UDG
-// #define UIB
+//#define UIB
 
 #ifdef UDG
 #include <cola2_msgs/CaptainStatus.h>
@@ -110,6 +112,7 @@ class TurbotIMCBroker {
   ros::Subscriber abort_sub_;
   // Timers
   ros::Timer timer_;
+  Mission mission_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
