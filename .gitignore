@@ -1,0 +1,6 @@
+workspace/.catkin_workspace
+workspace/build
+workspace/devel
+workspace/src/CMakeLists.txt
+workspace/src/launch_dune.sh
+workspace/src/pub_rhodamine.txt
