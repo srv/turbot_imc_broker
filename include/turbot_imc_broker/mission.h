@@ -22,17 +22,17 @@
 
 class MissionPoint {
  public:
-  MissionPoint() : x(0), y(0), z(0), speed(0), duration(0), radius(0),
-                   z_unit(0) {
+  MissionPoint() : north(0), east(0), depth(0), speed(0), duration(0),
+                   radius(0), altitude(false) {
     // empty
   }
-  double x;
-  double y;
-  double z;
+  double north;
+  double east;
+  double depth;
   double speed;
   double duration;
   double radius;
-  bool z_unit;
+  bool altitude;  //! if true, depth is altitude
 };
 
 class Mission {
@@ -52,11 +52,10 @@ class Mission {
     ned_->geodetic2Ned(msg.lat, msg.lon, 0.0, north, east, depth);
 
     MissionPoint point;
-    point.x = north;
-    point.y = east;
-    point.z = msg.z;
+    point.north = north;
+    point.east = east;
+    point.depth = msg.z;
     point.speed = msg.speed;
-    point.z_unit = 1; //depth
     points.push_back(point);
   }
 
@@ -68,13 +67,12 @@ class Mission {
     ned_->geodetic2Ned(msg.lat, msg.lon, 0.0, north, east, depth);
 
     MissionPoint point;
-    point.x = north;
-    point.y = east;
-    point.z = msg.z;
+    point.north = north;
+    point.east = east;
+    point.depth = msg.z;
     point.speed = msg.speed;
     point.duration = msg.duration;
     point.radius = msg.radius;
-    point.z_unit = 1; //depth
     points.push_back(point);
   }
 
