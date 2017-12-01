@@ -112,7 +112,7 @@ class TurbotIMCBroker {
   ros::Subscriber abort_sub_;
   // Timers
   ros::Timer timer_;
-  Mission mission_;
+  Mission* mission_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;

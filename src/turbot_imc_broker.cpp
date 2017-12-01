@@ -89,6 +89,18 @@ TurbotIMCBroker::TurbotIMCBroker() :
 
   // Create timers
   timer_ = nh.createTimer(ros::Duration(1), &TurbotIMCBroker::Timer, this);
+
+  // Get NED origin
+  double ned_lat = 0.0, ned_lon = 0.0;
+  const string param_ned_lat = "/navigator/ned_origin_lat";
+  const string param_ned_lon = "/navigator/ned_origin_lon";
+  if (nh.hasParam(param_ned_lat) && nh.hasParam(param_ned_lon)) {
+    nh.getParamCached(param_ned_lat, ned_lat);
+    nh.getParamCached(param_ned_lon, ned_lon);
+  } else {
+    ROS_WARN("NED Origin NOT FOUND!");
+  }
+  mission_ = new Mission(ned_lat, ned_lon);
 }
 
 void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
@@ -328,11 +340,11 @@ void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
 
   if (msg.op == IMC::PlanDB::DBOP_SET) { // if planDB operation = 0, then the argument contains a Plan Specification in the structure of a type Message
     //! Example of possible implementation. NOT TESTED!
-    const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message 
+    const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
-    IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message    
-    mission_.parse(*plan_specification);
-    
+    IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
+    mission_->parse(*plan_specification);
+
 
 
 
