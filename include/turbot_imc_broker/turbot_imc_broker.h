@@ -36,7 +36,8 @@
 #include <string>
 #include <fstream>
 #include <turbot_imc_broker/mission.h>
-#include <safety/RecoveryAction.h>
+#include <turbot_imc_broker/auv.h>
+
 
 
 
@@ -120,6 +121,8 @@ class TurbotIMCBroker {
   bool nav_sts_received_;
   bool is_plan_loaded_;
   int m_eta;
-  ros::ServiceClient recovery_actions_;
-
+  #ifdef UIB
+    TurbotAUV auv_;
+  #endif
+  // create a SparusAUV object for 
 };

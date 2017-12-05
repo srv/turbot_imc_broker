@@ -49,13 +49,6 @@ TurbotIMCBroker::TurbotIMCBroker() :
   nh.param<std::string>("outdir", params_.outdir, std::string("/tmp"));
   nh.param<std::string>("filename", params_.filename, std::string("rhodamine.csv"));
 
-  ROS_INFO_STREAM_THROTTLE(1, "[turbot_imc_broker:] Waiting for safety service...");
-  recovery_actions_ = nh.serviceClient<safety::RecoveryAction>("/safety/recovery_action");
-  bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
-  if (!is_available) {
-      ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
-  }
-
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   heartbeat_pub_ = nh.advertise<IMC::Heartbeat>("/IMC/Out/Heartbeat", 100);
@@ -386,16 +379,11 @@ void TurbotIMCBroker::PlanControlCallback(const IMC::PlanControl& msg) {
   }
 }
 
+
 void TurbotIMCBroker::AbortCallback(const IMC::Abort& msg) {
   ROS_INFO("IMC::Abort message received!: EMERGENCY SURFACE");
-
   if (msg.getName() == "Abort")
-  {
-    //launch the emergency surface service ...
-    safety::RecoveryAction srv;
-    srv.request.error_level = srv.request.EMERGENCY_SURFACE;
-    recovery_actions_.call(srv);
-  }
+    auv_.Abort();
 
   //! Stop mission and disable thrusters
 }
