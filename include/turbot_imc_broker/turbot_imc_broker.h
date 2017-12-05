@@ -104,7 +104,6 @@ class TurbotIMCBroker {
   ros::Publisher announce_pub_;
   ros::Publisher heartbeat_pub_;
   ros::Publisher vehicle_state_pub_;
-  ros::Publisher plan_control_state_pub_;
   ros::Publisher rhodamine_pub_;
   // Subscribers
   ros::Subscriber nav_sts_sub_;
