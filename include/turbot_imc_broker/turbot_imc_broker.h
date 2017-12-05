@@ -36,6 +36,8 @@
 #include <string>
 #include <fstream>
 #include <turbot_imc_broker/mission.h>
+#include <safety/RecoveryAction.h>
+
 
 
 // #define UDG
@@ -118,4 +120,6 @@ class TurbotIMCBroker {
   bool nav_sts_received_;
   bool is_plan_loaded_;
   int m_eta;
+  ros::ServiceClient recovery_actions_;
+
 };
