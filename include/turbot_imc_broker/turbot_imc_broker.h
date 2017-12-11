@@ -36,6 +36,9 @@
 #include <string>
 #include <fstream>
 #include <turbot_imc_broker/mission.h>
+#include <turbot_imc_broker/auv.h>
+
+
 
 
 // #define UDG
@@ -101,7 +104,6 @@ class TurbotIMCBroker {
   ros::Publisher announce_pub_;
   ros::Publisher heartbeat_pub_;
   ros::Publisher vehicle_state_pub_;
-  ros::Publisher plan_control_state_pub_;
   ros::Publisher rhodamine_pub_;
   // Subscribers
   ros::Subscriber nav_sts_sub_;
@@ -118,4 +120,8 @@ class TurbotIMCBroker {
   bool nav_sts_received_;
   bool is_plan_loaded_;
   int m_eta;
+  #ifdef UIB
+    TurbotAUV auv_;
+  #endif
+  // create a SparusAUV object for 
 };
