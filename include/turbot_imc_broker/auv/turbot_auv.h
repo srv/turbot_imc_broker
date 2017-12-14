@@ -8,101 +8,71 @@
 #include <safety/RecoveryAction.h>
 #include <safety/MissionStatus.h>
 
-class TurbotAUV : public Auv {
+class TurbotAUV : public AuvBase {
+ public:
+  TurbotAUV() : AuvBase(), is_plan_loaded_(false) {
+    plan_status_sub_ = nh_.subscribe("/control/mission_status", 1 ,
+                                    &TurbotAUV::MissionStatusCallback, this);
 
-  public:
-
-    bool is_plan_loaded_=true;
-    int m_eta=0;
-    TurbotAUV(void): Auv() { // constructor
-    ros::NodeHandle nh_("~");
     ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
     recovery_actions_ = nh_.serviceClient<safety::RecoveryAction>("/safety/recovery_action");
     bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
     if (!is_available) {
-        ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
-      }
+      ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
+    }
   }
 
-
-  IMC::PlanControlState GetPlanControlState(const safety::MissionStatus& msg,  int auv_id, int entity_id) {
-      ros::NodeHandle nh_("~");
-      plan_control_state_pub_ = nh_.advertise<IMC::PlanControlState>("/IMC/Out/PlanControlState", 100);
-      IMC::PlanControlState plan_control_state;
-      plan_control_state.setSource(auv_id);
-      plan_control_state.setSourceEntity(entity_id);
-      plan_control_state.setTimeStamp(ros::Time::now().toSec());
-
-      // Default values
-      plan_control_state.plan_eta = 0;
-      plan_control_state.plan_progress = 0;
-      plan_control_state.man_id = "";
-      // plan_control_state.man_id ??;
-      plan_control_state.man_eta = -1;
-
-      if (msg.current_wp > 0) { // A plan is under execution
-        plan_control_state.state = IMC::PlanControlState::PCS_EXECUTING;
-        plan_control_state.plan_eta = msg.total_wp * TIME_PER_MISSION_STEP;
-        plan_control_state.plan_progress = (float(msg.current_wp)/float(msg.total_wp))*100;
-        plan_control_state.man_id = std::to_string(msg.current_wp);
-        // plan_control_state.man_id ??;
-        plan_control_state.man_eta = -1;
-      }
-      else { // No plan under execution ...
-        if (is_plan_loaded_) { // ... and a plan is loaded.
-          plan_control_state.state = IMC::PlanControlState::PCS_READY;
-        }
-        else { // ... and no plan is loaded.
-          plan_control_state.state = IMC::PlanControlState::PCS_BLOCKED;
-        }
-      }
-
-      if (is_plan_loaded_) {
-        plan_control_state.plan_id = "last_plan SRV Group Turbot ";
-      }
-      else {
-        plan_control_state.plan_id = "";
-      }
-      m_eta= plan_control_state.plan_eta;
-      plan_control_state.last_outcome = plan_control_state.state;
-      plan_control_state_pub_.publish(plan_control_state);
-
-
-  }
-
+  /**
+   * @brief      Launch the emergency surface service
+   *
+   * @return     true if successful to launch
+   */
   bool Abort() {
-    //launch the emergency surface service ...
-      safety::RecoveryAction srv;
-      srv.request.error_level = srv.request.EMERGENCY_SURFACE;
-      recovery_actions_.call(srv);
+    safety::RecoveryAction srv;
+    srv.request.error_level = srv.request.EMERGENCY_SURFACE;
+    recovery_actions_.call(srv);
   }
 
 
-  // bool Goto(const MissionPoint& p) {
+  /**
+   * @brief      Go to a requested mission point
+   *
+   * @param[in]  p     The mission point
+   *
+   * @return     true if successful
+   */
+  bool Goto(const MissionPoint& p) {
+    // TODO
+  }
 
-  // }
+ private:
+  void MissionStatusCallback(const safety::MissionStatus& msg) {
+    if (msg.current_wp > 0) { // A plan is under execution
+      plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
+      plan_control_state_.plan_eta = msg.total_wp * TIME_PER_MISSION_STEP;
+      plan_control_state_.plan_progress = (float(msg.current_wp)/float(msg.total_wp))*100;
+      plan_control_state_.man_id = std::to_string(msg.current_wp);
+      // plan_control_state_.man_id ??;
+      plan_control_state_.man_eta = -1;
+    } else { // No plan under execution ...
+      if (is_plan_loaded_) { // ... and a plan is loaded.
+        plan_control_state_.state = IMC::PlanControlState::PCS_READY;
+      } else { // ... and no plan is loaded.
+        plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
+      }
+    }
 
-  private:
+    if (is_plan_loaded_) {
+      plan_control_state_.plan_id = "last_plan SRV Group Turbot ";
+    } else {
+      plan_control_state_.plan_id = "";
+    }
+    plan_control_state_.last_outcome = plan_control_state_.state;
+  }
+
+  bool is_plan_loaded_;
   ros::ServiceClient recovery_actions_;
-  ros::Publisher plan_control_state_pub_;
-
 };
 
-//! sparus_auv.h class sparus with the code of UdG
-// class SparusAUV : public AUV {
-//   IMC::EstimatedState GetEstimatedState(){
-
-//   }
-//   IMC::PlanControlState GetPlanControlState(){
-
-//   }
-//   bool Abort(){
-
-//   }
-//   bool Goto(const MissionPoint& p){
-
-//   }
-// };
-//
 
 #endif // TURBOT_AUV_H

@@ -24,29 +24,7 @@
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "turbot_imc_broker");
-  ros::NodeHandle nh;
-  ros::NodeHandle nhp("~");
-
-  // #ifdef UIB
-  //   ROS_INFO("--------------------");
-  //   ROS_INFO("   UIB is defined   ");
-  //   ROS_INFO("--------------------");
-  // #endif
-
-  // #ifdef UDG
-  //   ROS_INFO("--------------------");
-  //   ROS_INFO("   UDG is defined   ");
-  //   ROS_INFO("--------------------");
-  // #endif
-
-  // Read parameters
-  TurbotIMCBroker::Params params;
-  string outdir, filename;
-  nhp.param("outdir", params.outdir, string(""));
-  nhp.param("filename", params.filename, string(""));
-
   TurbotIMCBroker tb;
-  tb.setParams(params);
   ros::MultiThreadedSpinner spinner(4);  // Use 4 threads
   spinner.spin();  // spin() will not return until the node has been shutdown
   return 0;

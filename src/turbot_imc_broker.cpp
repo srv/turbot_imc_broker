@@ -36,21 +36,28 @@
 #include <IMC/Spec/FollowPath.hpp>
 
 
-TurbotIMCBroker::TurbotIMCBroker() :
-        nav_sts_received_(false),m_eta(0),
+TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false),m_eta(0),
         is_plan_loaded_(true) {
   ros::NodeHandle nh("~");
 
+  nh.param("outdir", params_.outdir, std::string(""));
+  nh.param("filename", params_.filename, std::string(""));
   nh.param("auv_id", params_.auv_id, 0x2000); // 8192
   nh.param("entity_id", params_.entity_id, 0xFF);  // LSTS said 255
   nh.param<std::string>("system_name", params_.system_name, std::string("turbot"));
   nh.param<std::string>("outdir", params_.outdir, std::string("/tmp"));
   nh.param<std::string>("filename", params_.filename, std::string("rhodamine.csv"));
 
+  std::string param_ned_lat;
+  std::string param_ned_lon;
+  nh.param<std::string>("param_ned_lat", param_ned_lat, std::string("/navigator/ned_origin_lat"));
+  nh.param<std::string>("param_ned_lon", param_ned_lon, std::string("/navigator/ned_origin_lon"));
+
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
   vehicle_state_pub_ = nh.advertise<IMC::VehicleState>("/IMC/Out/VehicleState", 100);
+  plan_control_state_pub_ = nh.advertise<IMC::PlanControlState>("/IMC/Out/PlanControlState", 100);
 
   // TODO IMC messages:
   //  - PlanControl: Neptus sent, used to start and stop a plan, and send quick
@@ -72,23 +79,16 @@ TurbotIMCBroker::TurbotIMCBroker() :
   abort_sub_ = nh.subscribe("/IMC/In/Abort", 1, &TurbotIMCBroker::AbortCallback, this);
   plan_db_sub_ = nh.subscribe("/IMC/In/PlanDB", 1, &TurbotIMCBroker::PlanDBCallback, this);
   plan_control_sub_ = nh.subscribe("/IMC/In/PlanControl", 1, &TurbotIMCBroker::PlanControlCallback, this);
-  rhodamine_sub_ = nh.subscribe("/sensors/rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
-#ifdef UIB
-  nav_sts_sub_ = nh.subscribe("/navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
-  plan_status_sub_ = nh.subscribe("/control/mission_status", 1 , &TurbotIMCBroker::MissionStatusCallback, this);
-#endif
-#ifdef UDG
-  nav_sts_sub_ = nh.subscribe("/cola2_navigation/nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
-  plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1 , &TurbotIMCBroker::CaptainStatusCallback, this);
-#endif
+
+  // Topics to be renamed depending on vehicle
+  rhodamine_sub_ = nh.subscribe("rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
+  nav_sts_sub_ = nh.subscribe("nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
 
   // Create timers
   timer_ = nh.createTimer(ros::Duration(1), &TurbotIMCBroker::Timer, this);
 
   // Get NED origin
   double ned_lat = 0.0, ned_lon = 0.0;
-  const string param_ned_lat = "/navigator/ned_origin_lat";
-  const string param_ned_lon = "/navigator/ned_origin_lon";
   if (nh.hasParam(param_ned_lat) && nh.hasParam(param_ned_lon)) {
     nh.getParamCached(param_ned_lat, ned_lat);
     nh.getParamCached(param_ned_lon, ned_lon);
@@ -96,97 +96,16 @@ TurbotIMCBroker::TurbotIMCBroker() :
     ROS_WARN("NED Origin NOT FOUND!");
   }
   mission_ = new Mission(ned_lat, ned_lon);
+
+  // Init AUV class
+  auv_.Init(params_.auv_id, params_.entity_id);
 }
 
 void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   if (!nav_sts_received_) return;
-  IMC::VehicleState vehicle_state_msg;
-
-  vehicle_state_msg.setSource(params_.auv_id);
-  vehicle_state_msg.setSourceEntity(params_.entity_id);
-  vehicle_state_msg.setTimeStamp(ros::Time::now().toSec());
-  if (is_plan_loaded_) { // if plan is loaded, op. mode= MANEUVER (a maneuver is executing)
-    vehicle_state_msg.op_mode=3;
-    //! Maneuver -- ETA.
-    vehicle_state_msg.maneuver_eta=m_eta;
-  }
-  else{
-    vehicle_state_msg.op_mode=0; // else, the vehicle is in op.=SERVICE (ready to service request)
-    //! Maneuver -- ETA.
-    vehicle_state_msg.maneuver_eta=65535; // value when no maneuver
-  }
-  // still to define how to capture an error .....
-  vehicle_state_msg.error_count=0;
-  vehicle_state_msg.error_ents="no error";
-  //! Maneuver -- Type.
-  vehicle_state_msg.maneuver_type=0;
-  //! Maneuver -- Start Time.
-  vehicle_state_msg.maneuver_stime=0;
-  //! Control Loops.
-  vehicle_state_msg.control_loops=0x00000000;  // no use
-  //! Flags.
-  vehicle_state_msg.flags=0x00; //0x01 when the maneuver is done, 0 elsewhere
-  //! Last Error -- Description.
-  vehicle_state_msg.last_error="no error";
-  //! Last Error -- Time.
-  vehicle_state_msg.last_error_time=0;
-  vehicle_state_pub_.publish(vehicle_state_msg);
-
+  vehicle_state_pub_.publish(auv_.GetVehicleState());
+  plan_control_state_pub_.publish(auv_.GetPlanControlState());
 }
-
-#ifdef UDG
-void TurbotIMCBroker::CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg) {
-  // IMC::PlanControlState plan_control_state;
-  // plan_control_state.setSource(params_.auv_id);
-  // plan_control_state.setSourceEntity(params_.entity_id);
-  // plan_control_state.setTimeStamp(ros::Time::now().toSec());
-
-  // // Default values
-  // plan_control_state.plan_eta = 0;
-  // plan_control_state.plan_progress = 0;
-  // plan_control_state.man_id = "";
-  // // plan_control_state.man_id ??;
-  // plan_control_state.man_eta = -1;
-
-  // if (msg.mission_active) { // A plan is under execution
-  //   plan_control_state.state = IMC::PlanControlState::PCS_EXECUTING;
-  //   plan_control_state.plan_eta = msg.total_steps * TIME_PER_MISSION_STEP;
-  //   plan_control_state.plan_progress = int((float(msg.current_step)/float(msg.total_steps))*100);
-  //   plan_control_state.man_id = std::to_string(msg.current_step);
-  //   // plan_control_state.man_id ??;
-  //   plan_control_state.man_eta = -1;
-  // }
-  // else { // No plan under execution ...
-  //   if (msg.active_controller == 0) { // ... and no actions are being executed ...
-  //     if (is_plan_loaded_) { // ... and a plan is loaded.
-  //       plan_control_state.state = IMC::PlanControlState::PCS_READY;
-  //     }
-  //     else { // ... and no plan is loaded.
-  //       plan_control_state.state = IMC::PlanControlState::PCS_BLOCKED;
-  //     }
-  //   }
-  //   else { // ... but an action (goto, keep position, ...) is under execution
-  //     plan_control_state.state = IMC::PlanControlState::PCS_BLOCKED;
-  //   }
-  // }
-  // if (is_plan_loaded_) {
-  //   plan_control_state.plan_id = "last_plan";
-  // }
-  // else {
-  //   plan_control_state.plan_id = "";
-  // }
-
-  // plan_control_state.last_outcome = plan_control_state.state;
-  // plan_control_state_pub_.publish(plan_control_state);
-}
-#endif
-
-#ifdef UIB
-void TurbotIMCBroker::MissionStatusCallback(const safety::MissionStatus& msg) {
-  // auv_.GetPlanControlState(msg, params_.auv_id, params_.entity_id);
-}
-#endif
-
 
 void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
   // publish rhodamine message
@@ -213,10 +132,9 @@ void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineCo
         << depth << ","
         << msg->concentration_ppb << ","
         << msg->concentration_raw << ","
-        << -1 <<  endl;
+        << -1 <<  std::endl;
   f_csv.close();
 }
-
 
 void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   IMC::EstimatedState imc_msg;
@@ -283,9 +201,6 @@ void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     mission_->parse(*plan_specification);
-
-
-
 
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
