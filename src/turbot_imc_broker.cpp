@@ -26,8 +26,6 @@
 
 // IMC messages to use: classes will be IMC::MessageType
 #include <IMC/Spec/EstimatedState.hpp>
-#include <IMC/Spec/Announce.hpp>
-#include <IMC/Spec/Heartbeat.hpp>
 #include <IMC/Spec/RhodamineDye.hpp>
 #include <IMC/Spec/VehicleState.hpp>
 #include <IMC/Spec/PlanControlState.hpp>
@@ -51,8 +49,6 @@ TurbotIMCBroker::TurbotIMCBroker() :
 
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
-  heartbeat_pub_ = nh.advertise<IMC::Heartbeat>("/IMC/Out/Heartbeat", 100);
-  announce_pub_ = nh.advertise<IMC::Announce>("/IMC/Out/Announce", 100);
   rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
   vehicle_state_pub_ = nh.advertise<IMC::VehicleState>("/IMC/Out/VehicleState", 100);
 
@@ -104,25 +100,6 @@ TurbotIMCBroker::TurbotIMCBroker() :
 
 void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
   if (!nav_sts_received_) return;
-  IMC::Announce announce_msg;
-  announce_msg.setSource(params_.auv_id);
-  announce_msg.setSourceEntity(params_.entity_id);
-  announce_msg.setTimeStamp(ros::Time::now().toSec());
-  announce_msg.sys_name = params_.system_name;
-  announce_msg.sys_type = IMC::SYSTEMTYPE_UUV;
-  announce_msg.lat = nav_sts_.global_position.latitude*M_PI/180.0;
-  announce_msg.lon = nav_sts_.global_position.longitude*M_PI/180.0;
-  announce_msg.height = -nav_sts_.position.depth;
-  announce_msg.services = "imc+info://0.0.0.0/version/5.4.8;imc+udp://192.168.1.199:6002;imc+tcp://192.168.1.199:32603";
-  announce_pub_.publish(announce_msg);
-
-  // Tell we are alive
-  IMC::Heartbeat heartbeat_msg;
-  heartbeat_msg.setSource(params_.auv_id);
-  heartbeat_msg.setSourceEntity(params_.entity_id);
-  heartbeat_msg.setTimeStamp(announce_msg.getTimeStamp());
-  heartbeat_pub_.publish(heartbeat_msg);
-
   IMC::VehicleState vehicle_state_msg;
 
   vehicle_state_msg.setSource(params_.auv_id);
@@ -206,7 +183,7 @@ void TurbotIMCBroker::CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg
 
 #ifdef UIB
 void TurbotIMCBroker::MissionStatusCallback(const safety::MissionStatus& msg) {
-  auv_.GetPlanControlState(msg, params_.auv_id, params_.entity_id);
+  // auv_.GetPlanControlState(msg, params_.auv_id, params_.entity_id);
 }
 #endif
 

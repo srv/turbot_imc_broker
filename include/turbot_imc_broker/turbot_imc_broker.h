@@ -101,8 +101,6 @@ class TurbotIMCBroker {
   Params params_; //!> Stores parameters.
   // Publishers
   ros::Publisher estimated_state_pub_;
-  ros::Publisher announce_pub_;
-  ros::Publisher heartbeat_pub_;
   ros::Publisher vehicle_state_pub_;
   ros::Publisher rhodamine_pub_;
   // Subscribers
@@ -123,5 +121,5 @@ class TurbotIMCBroker {
   #ifdef UIB
     TurbotAUV auv_;
   #endif
-  // create a SparusAUV object for 
+  // create a SparusAUV object for
 };
