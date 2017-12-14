@@ -12,19 +12,18 @@
     <param name="system_type" value="uuv"/>
     <param name="system_imc_id" value="8192"/>
     <param name="enable_loopback" value="True"/>
-    <param name="udp_port" value="6001"/>
+    <param name="udp_port" value="6002"/>
 
     <!--param name="udp_port_tries" value="10"/-->
     <!--param name="multicast_addr" value="224.0.75.69"/-->
     <!--param name="multicast_port" value="30100""/-->
     <!--param name="multicast_port_range" value="5"/-->
 
-    <param name="static_destinations_addrs" value="192.168.2.104:6001,172.17.0.1:6001"/>
+    <param name="static_destinations_addrs" value="192.168.2.104:6001"/>
   </node>
 
   <node pkg="turbot_imc_broker" type="turbot_imc_broker_node" name="turbot_imc_broker_node" output="screen">
   	<param name="outdir" value="$(find turbot_imc_broker)/data"/>
     <param name="filename" value="rhodamine_data.csv"/>
   </node>
-
 </launch>
