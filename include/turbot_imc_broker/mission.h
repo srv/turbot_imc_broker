@@ -3,13 +3,7 @@
 
 #include <ros/ros.h>
 
-
-#ifdef UDG
-#include <cola2_navigation/ned.h>
-#endif
-#ifdef UIB
-#include <utils/ned.h>
-#endif
+#include <turbot_imc_broker/ned.h>
 
 // Base IMC template
 #include <ros_imc_broker/ImcTypes.hpp>

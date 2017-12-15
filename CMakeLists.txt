@@ -12,6 +12,8 @@ set(UDG OFF)
 #  tf
 #)
 
+find_package(Eigen3 REQUIRED)
+
 if(UIB)
   message("------------------")
   message("UIB Mode selected!")
@@ -23,7 +25,6 @@ if(UIB)
      ros_imc_broker
      tf
      safety
-     utils
    )
   add_definitions(-DUIB)
 elseif(UDG)
@@ -45,6 +46,7 @@ endif(UIB)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 catkin_package(
+  LIBRARIES ned
   INCLUDE_DIRS include
   CATKIN_DEPENDS auv_msgs safety cyclops_rhodamine_ros ros_imc_broker roscpp tf
 )
@@ -52,12 +54,16 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
 )
+
+add_library(ned src/ned.cpp)
 
 add_executable(${PROJECT_NAME}_node src/turbot_imc_broker_node.cpp
                                     src/turbot_imc_broker.cpp)
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME}_node
+  ned
   ${catkin_LIBRARIES}
 )
 
