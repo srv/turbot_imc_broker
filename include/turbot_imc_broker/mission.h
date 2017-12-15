@@ -17,13 +17,13 @@
 
 class MissionPoint {
  public:
-  MissionPoint() : north(0), east(0), depth(0), speed(0), duration(0),
+  MissionPoint() : north(0), east(0), z(0), speed(0), duration(0),
                    radius(0), altitude(false) {
     // empty
   }
   double north;
   double east;
-  double depth;
+  double z; //TODO: he canviat depth per z ja que al poder triar si es depth o altitude amb el bolea de sota crec que és més quarent
   double speed;
   double duration;
   double radius;
@@ -49,7 +49,7 @@ class Mission {
     MissionPoint point;
     point.north = north;
     point.east = east;
-    point.depth = msg.z;
+    point.z = msg.z;
     point.speed = msg.speed;
     points.push_back(point);
   }
@@ -64,7 +64,7 @@ class Mission {
     MissionPoint point;
     point.north = north;
     point.east = east;
-    point.depth = msg.z;
+    point.z = msg.z;
     point.speed = msg.speed;
     point.duration = msg.duration;
     point.radius = msg.radius;
