@@ -7,7 +7,7 @@ class SparusAUV : public AuvBase {
  public:
   SparusAUV() : AuvBase(auv_id, entity_id) {
     plan_status_sub_ = nh_.subscribe("/cola2_control/captain_status", 1,
-                                    &SparusAUV::CaptainStatusCallback, this);
+                                     &SparusAUV::CaptainStatusCallback, this);
   }
 
   bool Abort(){

@@ -35,7 +35,6 @@
 
 #include <string>
 #include <fstream>
-#include <turbot_imc_broker/mission.h>
 
 #ifdef UDG
 #include <turbot_imc_broker/auv/sparus_auv.h>
@@ -93,7 +92,6 @@ class TurbotIMCBroker {
   ros::Subscriber nav_sts_sub_;
   // Timers
   ros::Timer timer_;
-  Mission* mission_;
 
   auv_msgs::NavSts nav_sts_;
   bool nav_sts_received_;
@@ -105,5 +103,4 @@ class TurbotIMCBroker {
   #ifdef UDG
   SparusAUV auv_;
   #endif
-  // create a SparusAUV object for
 };
