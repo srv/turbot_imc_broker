@@ -62,7 +62,6 @@ class AuvBase { // parent class
   ros::NodeHandle nh_;
 
   // DO NOT ADD IMC PUBLISHERS HERE
-  ros::Subscriber nav_sts_sub_;
   ros::Subscriber plan_status_sub_;
 
   IMC::PlanControlState plan_control_state_;
