@@ -32,7 +32,22 @@ class MissionPoint {
 
 class Mission {
  public:
-  Mission(const double& ned_lat, const double& ned_lon) {
+  Mission() {
+    ros::NodeHandle nh("~");
+
+    std::string param_ned_lat;
+    std::string param_ned_lon;
+    nh.param<std::string>("param_ned_lat", param_ned_lat, std::string("/navigator/ned_origin_lat"));
+    nh.param<std::string>("param_ned_lon", param_ned_lon, std::string("/navigator/ned_origin_lon"));
+
+    // Get NED origin
+    double ned_lat = 0.0, ned_lon = 0.0;
+    if (nh.hasParam(param_ned_lat) && nh.hasParam(param_ned_lon)) {
+      nh.getParamCached(param_ned_lat, ned_lat);
+      nh.getParamCached(param_ned_lon, ned_lon);
+    } else {
+      ROS_WARN("NED Origin NOT FOUND!");
+    }
     ned_ = new Ned(ned_lat, ned_lon, 0.0);
   }
 
@@ -106,6 +121,10 @@ class Mission {
 
   void run() {
 
+  }
+
+  size_t size() const {
+    return points.size();
   }
 
   std::vector<MissionPoint> points;

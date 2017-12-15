@@ -48,11 +48,6 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false),m_eta(0),
   nh.param<std::string>("outdir", params_.outdir, std::string("/tmp"));
   nh.param<std::string>("filename", params_.filename, std::string("rhodamine.csv"));
 
-  std::string param_ned_lat;
-  std::string param_ned_lon;
-  nh.param<std::string>("param_ned_lat", param_ned_lat, std::string("/navigator/ned_origin_lat"));
-  nh.param<std::string>("param_ned_lon", param_ned_lon, std::string("/navigator/ned_origin_lon"));
-
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
@@ -86,16 +81,6 @@ TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false),m_eta(0),
 
   // Create timers
   timer_ = nh.createTimer(ros::Duration(1), &TurbotIMCBroker::Timer, this);
-
-  // Get NED origin
-  double ned_lat = 0.0, ned_lon = 0.0;
-  if (nh.hasParam(param_ned_lat) && nh.hasParam(param_ned_lon)) {
-    nh.getParamCached(param_ned_lat, ned_lat);
-    nh.getParamCached(param_ned_lon, ned_lon);
-  } else {
-    ROS_WARN("NED Origin NOT FOUND!");
-  }
-  mission_ = new Mission(ned_lat, ned_lon);
 
   // Init AUV class
   auv_.Init(params_.auv_id, params_.entity_id);
@@ -200,8 +185,7 @@ void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
     const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
-    mission_->parse(*plan_specification);
-
+    auv_.LoadMission(*plan_specification);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
@@ -210,6 +194,7 @@ void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
     // Should return PlanDBInformation
   } else if (msg.op == IMC::PlanDB::DBOP_CLEAR) {
     // Should delete all DB records
+    auv_.ClearMission();
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
   } else {
@@ -222,6 +207,7 @@ void TurbotIMCBroker::PlanControlCallback(const IMC::PlanControl& msg) {
 
   if (msg.op == IMC::PlanControl::PC_START) {
     //! Start Plan.
+    auv_.StartMission();
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
   } else if (msg.op == IMC::PlanControl::PC_LOAD) {

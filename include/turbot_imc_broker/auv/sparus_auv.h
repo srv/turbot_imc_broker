@@ -7,10 +7,12 @@
 #include <cola2_msgs/Goto.h>
 
 class SparusAUV : public AuvBase {
+
 public:
     SparusAUV() : AuvBase(), is_plan_loaded_(false) {
       plan_status_sub_ = nh_.subscribe("/cola2_control/captain_status", 1,
                                        &SparusAUV::CaptainStatusCallback, this);
+
 
       ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
       recovery_actions_ = nh_.serviceClient<cola2_msgs::RecoveryAction>("/cola2_safety/recovery_action");
