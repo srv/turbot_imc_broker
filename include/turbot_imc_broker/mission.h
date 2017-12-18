@@ -18,7 +18,7 @@
 class MissionPoint {
  public:
   MissionPoint() : north(0), east(0), z(0), speed(0), duration(0),
-                   radius(0), altitude(false) {
+                   radius(0), is_altitude(false) {
     // empty
   }
   double north;
@@ -28,7 +28,7 @@ class MissionPoint {
   double speed;
   double duration;
   double radius;
-  bool altitude;  //! if true, depth is altitude
+  bool is_altitude;  //! if true, depth is altitude
 };
 
 class Mission {

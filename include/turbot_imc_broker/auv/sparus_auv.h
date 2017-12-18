@@ -53,7 +53,7 @@ public:
       srv.request.position.y = p.east;
       srv.request.position.z = p.z;
       srv.request.altitude = p.z;
-      srv.request.altitude_mode = p.altitude;
+      srv.request.altitude_mode = p.is_altitude;
       srv.request.disable_axis.x = false;
       srv.request.disable_axis.y = true;
       srv.request.disable_axis.z = false;
