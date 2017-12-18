@@ -24,6 +24,7 @@ class MissionPoint {
   double north;
   double east;
   double z; //TODO: he canviat depth per z ja que al poder triar si es depth o altitude amb el bolea de sota crec que és més quarent
+  double yaw;
   double speed;
   double duration;
   double radius;
@@ -65,6 +66,7 @@ class Mission {
     point.north = north;
     point.east = east;
     point.z = msg.z;
+    point.yaw = msg.yaw;
     point.speed = msg.speed;
     points.push_back(point);
   }
@@ -80,6 +82,7 @@ class Mission {
     point.north = north;
     point.east = east;
     point.z = msg.z;
+    point.yaw = -1;
     point.speed = msg.speed;
     point.duration = msg.duration;
     point.radius = msg.radius;
