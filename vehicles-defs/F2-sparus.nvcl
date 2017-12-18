@@ -422,9 +422,9 @@
                     <port>6002</port>
                     <port-tcp>6001</port-tcp>
                     <!-- turn off UDP and on TCP Paulo -->
-                    <udp-on>false</udp-on>
-                    <tcp-on>true</tcp-on>
-                    <imc-id>20:00</imc-id>
+                    <udp-on>true</udp-on>
+                    <tcp-on>false</tcp-on>
+                    <imc-id>20:01</imc-id>
                 </imc>
             </protocols-args>
         </comm-mean>
