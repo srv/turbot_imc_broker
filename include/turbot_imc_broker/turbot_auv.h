@@ -29,7 +29,6 @@
 #include <safety/RecoveryAction.h>
 #include <safety/MissionStatus.h>
 
-#define TIME_PER_MISSION_STEP   100
 
 class TurbotAUV : public AuvBase {
  public:
