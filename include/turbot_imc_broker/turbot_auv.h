@@ -24,6 +24,8 @@
 #define TURBOT_AUV_H
 
 #include <turbot_imc_broker/auv_base.h>
+
+#include <control/GotoWithYaw.h>
 #include <safety/RecoveryAction.h>
 #include <safety/MissionStatus.h>
 
@@ -37,6 +39,7 @@ class TurbotAUV : public AuvBase {
 
     ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
     recovery_actions_ = nh.serviceClient<safety::RecoveryAction>("/safety/recovery_action");
+    client_goto_ = nh.serviceClient<control::GotoWithYaw>("/control/goto_holonomic");
     bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
     if (!is_available) {
       ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
@@ -59,11 +62,28 @@ class TurbotAUV : public AuvBase {
    * @brief      Go to a requested mission point
    *
    * @param[in]  p     The mission point
-   *
+   * convert the data in the MissionPoint ( double north; double east; double z; double speed; double duration; double radius;
+    bool altitude; ) into a goal point for the vehicle
    * @return     true if successful
    */
-  bool Goto(const MissionPoint& p) {
-    // TODO
+  bool Goto(const MissionPoint& p) { // implement different versions for Udg and UIB
+    // Call goto service -> pendent acabar aixó  fbf 15/12/2017
+    control::GotoWithYaw srv;
+    srv.request.north_lat = p.north;
+    srv.request.east_lon = p.east;
+    srv.request.z = p.z;
+    //srv.request.yaw = yaw; //take the yaw fro the Goto Maneuver
+    //srv.request.tolerance = go_to_tolerance_;
+    if (srv_running_== false) {
+      if (!client_goto_.call(srv)) { // call service for goto.
+        ROS_ERROR_STREAM("[MerbotsIbvsRecovery]: Failed to call service Go to with Yaw " ); //
+        return false;
+      }
+      ROS_INFO_STREAM("[MerbotsIbvsRecovery]: Go to service called!");
+      srv_running_ = true; // indicates if goto is active.
+      return true;
+      // TODO
+    }
   }
 
  private:
@@ -93,6 +113,8 @@ class TurbotAUV : public AuvBase {
 
   bool is_plan_loaded_;
   ros::ServiceClient recovery_actions_;
+  ros::ServiceClient client_goto_;
+  bool srv_running_= false;
 };
 
 
