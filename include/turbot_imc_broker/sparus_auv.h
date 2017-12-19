@@ -28,6 +28,7 @@
 #include <cola2_msgs/RecoveryAction.h>
 #include <cola2_msgs/Goto.h>
 
+
 class SparusAUV : public AuvBase {
 
 public:

@@ -47,6 +47,9 @@
 #include <IMC/Spec/PlanDBInformation.hpp>
 #include <IMC/Spec/Abort.hpp>
 
+#define TIME_PER_MISSION_STEP   100
+
+
 class AuvBase { // parent class
  public:
   struct Params {
