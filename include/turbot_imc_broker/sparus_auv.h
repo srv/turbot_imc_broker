@@ -1,28 +1,51 @@
+// The MIT License (MIT)
+
+// Copyright (c) 2017 Universitat de les Illes Balears
+
+//  Permission is hereby granted, free of charge, to any person obtaining a
+//  copy of this software and associated documentation files (the "Software"),
+//  to deal in the Software without restriction, including without limitation
+//  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+//  and/or sell copies of the Software, and to permit persons to whom the
+//  Software is furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in
+//  all copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+//  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+//  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+//  DEALINGS IN THE SOFTWARE.
+
 #ifndef SPARUS_AUV_H
 #define SPARUS_AUV_H
 
-#include <turbot_imc_broker/auv/auv_base.h>
+#include <turbot_imc_broker/auv_base.h>
 #include <cola2_msgs/CaptainStatus.h>
 #include <cola2_msgs/RecoveryAction.h>
 #include <cola2_msgs/Goto.h>
+
 
 class SparusAUV : public AuvBase {
 
 public:
     SparusAUV() : AuvBase(), is_plan_loaded_(false) {
-      plan_status_sub_ = nh_.subscribe("/cola2_control/captain_status", 1,
+      plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1,
                                        &SparusAUV::CaptainStatusCallback, this);
 
 
       ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
-      recovery_actions_ = nh_.serviceClient<cola2_msgs::RecoveryAction>("/cola2_safety/recovery_action");
+      recovery_actions_ = nh.serviceClient<cola2_msgs::RecoveryAction>("/cola2_safety/recovery_action");
       bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
       if (!is_available) {
         ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
       }
 
       ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for goto service...");
-      goto_srv_ = nh_.serviceClient<cola2_msgs::Goto>("/cola2_control/enable_goto");
+      goto_srv_ = nh.serviceClient<cola2_msgs::Goto>("/cola2_control/enable_goto");
       is_available = goto_srv_.waitForExistence(ros::Duration(10));
       if (!is_available) {
         ROS_ERROR_STREAM("[ turbot_imc_broker ]: Goto service is not available.");
@@ -39,6 +62,19 @@ public:
       srv.request.error_level = srv.request.EMERGENCY_SURFACE;
       recovery_actions_.call(srv);
     }
+
+
+    /**
+     * @brief      Stop the curent mission if any
+     *
+     * @return     true if successful to launch
+     */
+    bool StopMission() {
+      cola2_msgs::RecoveryAction srv;
+      srv.request.error_level = srv.request.ABORT_MISSION;
+      recovery_actions_.call(srv);
+    }
+
 
     /**
      * @brief      Go to a requested mission point
@@ -67,9 +103,9 @@ public:
       srv.request.orientation_tolerance.pitch = 0.3;
       srv.request.orientation_tolerance.yaw = 0.3;
       srv.request.linear_velocity.x = p.speed;
-      srv.request.blocking = false;
+      srv.request.blocking = true;
       srv.request.keep_position = false;
-      srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_GLOBAL;
+      srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_NED;
       srv.request.priority = 10;
       if (p.duration > 0) {
         srv.request.keep_position = true;
