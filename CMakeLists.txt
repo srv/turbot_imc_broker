@@ -25,6 +25,7 @@ if(UIB)
      ros_imc_broker
      tf
      safety
+     control
    )
   add_definitions(-DUIB)
 elseif(UDG)
