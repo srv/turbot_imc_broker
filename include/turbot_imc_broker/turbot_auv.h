@@ -25,7 +25,7 @@
 
 #include <turbot_imc_broker/auv_base.h>
 
-#include <control/GotoWithYaw.h>
+#include <control/Goto.h>
 #include <safety/RecoveryAction.h>
 #include <safety/MissionStatus.h>
 
@@ -38,7 +38,7 @@ class TurbotAUV : public AuvBase {
 
     ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
     recovery_actions_ = nh.serviceClient<safety::RecoveryAction>("/safety/recovery_action");
-    client_goto_ = nh.serviceClient<control::GotoWithYaw>("/control/goto_holonomic");
+    client_goto_ = nh.serviceClient<control::Goto>("/control/goto_local");
     bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
     if (!is_available) {
       ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
@@ -57,7 +57,7 @@ class TurbotAUV : public AuvBase {
   }
 
   bool StopMission() {
-    // TODO 
+    // TODO
   }
 
 
@@ -71,7 +71,7 @@ class TurbotAUV : public AuvBase {
    */
   bool Goto(const MissionPoint& p) { // implement different versions for Udg and UIB
     // Call goto service -> pendent acabar aixó  fbf 15/12/2017
-    control::GotoWithYaw srv;
+    control::Goto srv;
     srv.request.north_lat = p.north;
     srv.request.east_lon = p.east;
     srv.request.z = p.z;

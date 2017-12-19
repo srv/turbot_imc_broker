@@ -167,7 +167,7 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   tf::Vector3 ned_velocity = R.inverse()*body_velocity;
 
   // NED frame speeds
-  imc_msg.vx = ned_velocity.x();
+  imc_msg.vx = -ned_velocity.x();
   imc_msg.vy = ned_velocity.y();
   imc_msg.vz = ned_velocity.z();
 
@@ -233,7 +233,7 @@ IMC::PlanDBState AuvBase::CreateState(const IMC::PlanSpecification& spec) {
   state.change_sname = spec.getName();  // TODO: change for source name. Neptus?
   state.plans_info.push_back(CreateInfo(spec));
   state.md5 = ComputeMD5(spec.toString());
-  return state;		
+  return state;
 }
 
 IMC::PlanDBInformation AuvBase::CreateInfo(const IMC::PlanSpecification& spec) {
@@ -244,7 +244,7 @@ IMC::PlanDBInformation AuvBase::CreateInfo(const IMC::PlanSpecification& spec) {
   info.change_sid = spec.getSourceEntity();
   info.change_sname = spec.getName();  // TODO: change for source name. Neptus?
   info.md5 = ComputeMD5(spec.toString());
-  return info;		
+  return info;
 }
 
 void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
@@ -254,7 +254,7 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
   if (msg.op == IMC::PlanControl::PC_START) {
     //! Start Plan.
     ROS_INFO("IMC::PlanControl START");
-    
+
     if (!msg.arg.isNull()) {
       // If arg exists: it's a quick plan
       const IMC::Message* cmsg = msg.arg.get();
