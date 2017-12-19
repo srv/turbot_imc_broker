@@ -23,8 +23,8 @@
     <param name="filename" value="rhodamine_data.csv"/>
 
     <!-- NED -->
-    <param name="param_ned_lat" value="/navigator/ned_origin_lat"/>
-    <param name="param_ned_lon" value="/navigator/ned_origin_lon"/>
+    <param name="param_ned_lat" value="/navigator/ned_latitude"/>
+    <param name="param_ned_lon" value="/navigator/ned_longitude"/>
 
     <remap from="~rhodamine" to="/cola2_sensors/rhodamine"/>
     <remap from="~nav_sts" to="/cola2_navigation/nav_sts"/>
