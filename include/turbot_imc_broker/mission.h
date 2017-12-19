@@ -75,7 +75,7 @@ class Mission {
   }
 
   void push_back(const IMC::FollowPath& msg) {
-    ROS_WARN_STREAM("[turbot_imc_broker]: Not implemented!");
+    ROS_WARN_STREAM("[turbot_imc_broker]: FollowPath not implemented!");
   }
 
   void push_back(const IMC::Goto& msg) {
@@ -113,6 +113,10 @@ class Mission {
   }
 
   void parse(const IMC::PlanSpecification& msg) {
+
+    // Delete previous mission
+    points.clear();
+
     raw_msg_ = msg;
 
     // define it as a variable type const_iterator defined in the MessaList class,

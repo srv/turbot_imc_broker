@@ -103,9 +103,9 @@ public:
       srv.request.orientation_tolerance.pitch = 0.3;
       srv.request.orientation_tolerance.yaw = 0.3;
       srv.request.linear_velocity.x = p.speed;
-      srv.request.blocking = false;
+      srv.request.blocking = true;
       srv.request.keep_position = false;
-      srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_GLOBAL;
+      srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_NED;
       srv.request.priority = 10;
       if (p.duration > 0) {
         srv.request.keep_position = true;
