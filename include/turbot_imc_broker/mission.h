@@ -82,7 +82,8 @@ class Mission {
     ROS_INFO_STREAM("[turbot_imc_broker]: Goto ("
                     << msg.lat << ", " << msg.lon << ")");
     double north, east, depth;
-    ned_->geodetic2Ned(msg.lat, msg.lon, 0.0, north, east, depth);
+    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
+    ROS_INFO_STREAM("[turbot_imc_broker]: NED (" << north << ", " << east << ")");
 
     MissionPoint point;
     point.north = north;
