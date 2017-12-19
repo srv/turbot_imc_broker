@@ -181,32 +181,70 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
   // Copy message
   plan_db_ = msg;
 
+  plan_db_.type = IMC::PlanDB::DBT_SUCCESS;
+
   if (msg.op == IMC::PlanDB::DBOP_SET) { // if planDB operation = 0, then the argument contains a Plan Specification in the structure of a type Message
     //! Example of possible implementation. NOT TESTED!
     ROS_INFO("IMC::PlanDB SET");
     const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
+    plan_specification_ = *plan_specification;
     mission.parse(*plan_specification);
+    plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
     ROS_INFO("IMC::PlanDB DELETE");
+    plan_db_.arg.clear();
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
     // Should return PlanSpecification
     ROS_INFO("IMC::PlanDB GET");
+    plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_GET_INFO) {
     // Should return PlanDBInformation
     ROS_INFO("IMC::PlanDB GET INFO");
+    IMC::PlanDBInformation info = CreateInfo(plan_specification_);
+    plan_db_.arg.set(info);
   } else if (msg.op == IMC::PlanDB::DBOP_CLEAR) {
     // Should delete all DB records
     ROS_INFO("IMC::PlanDB CLEAR");
+    plan_db_.arg.clear();
     mission.points.clear();
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
     ROS_INFO("IMC::PlanDB GET STATE");
+    IMC::PlanDBState state = CreateState(plan_specification_);
+    plan_db_.arg.set(state);
   } else {
     ROS_INFO("IMC::PlanDB operation not implemented");
+    plan_db_.type = IMC::PlanDB::DBT_FAILURE;
   }
+
+  // Publish reply
+  plan_db_pub_.publish(plan_db_);
+}
+
+IMC::PlanDBState AuvBase::CreateState(const IMC::PlanSpecification& spec) {
+  IMC::PlanDBState state;
+  state.plan_count = static_cast<uint16_t>(is_plan_loaded_);
+  state.plan_size = spec.getSerializationSize();
+  state.change_time = spec.getTimeStamp();
+  state.change_sid = spec.getSourceEntity();
+  state.change_sname = spec.getName();  // TODO: change for source name. Neptus?
+  state.plans_info.push_back(CreateInfo(spec));
+  state.md5 = ComputeMD5(spec.toString());
+  return state;		
+}
+
+IMC::PlanDBInformation AuvBase::CreateInfo(const IMC::PlanSpecification& spec) {
+  IMC::PlanDBInformation info;
+  info.plan_id = spec.plan_id;
+  info.plan_size = spec.getSerializationSize();
+  info.change_time = spec.getTimeStamp();
+  info.change_sid = spec.getSourceEntity();
+  info.change_sname = spec.getName();  // TODO: change for source name. Neptus?
+  info.md5 = ComputeMD5(spec.toString());
+  return info;		
 }
 
 void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {

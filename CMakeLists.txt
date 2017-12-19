@@ -54,17 +54,20 @@ catkin_package(
 
 include_directories(
   include
+  src/md5
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
 )
 
 add_library(ned src/ned.cpp)
+add_library(md5 src/md5/md5.cpp)
 
 add_executable(${PROJECT_NAME}_node src/turbot_imc_broker_node.cpp
                                     src/auv_base.cpp)
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME}_node
   ned
+  md5
   ${catkin_LIBRARIES}
 )
 

@@ -47,9 +47,16 @@
 #include <IMC/Spec/PlanDBInformation.hpp>
 #include <IMC/Spec/Abort.hpp>
 
+#include "md5.h"
+
 #define TIME_PER_MISSION_STEP   100
 
-
+static std::vector<char> ComputeMD5(const std::string& s) {
+  MD5 md5(s);
+  std::string md5_str = md5.hexdigest();
+  std::vector<char> md5_vec(md5_str.begin(), md5_str.end());
+  return md5_vec;
+}
 class AuvBase { // parent class
  public:
   struct Params {
@@ -89,6 +96,9 @@ class AuvBase { // parent class
    * @brief      Clears a mission
    */
   void ClearMission();
+
+  IMC::PlanDBState CreateState(const IMC::PlanSpecification& spec);
+  IMC::PlanDBInformation CreateInfo(const IMC::PlanSpecification& spec);
 
   //@note: Getters in alphabetical order
 

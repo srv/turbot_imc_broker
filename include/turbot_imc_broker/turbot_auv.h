@@ -56,6 +56,10 @@ class TurbotAUV : public AuvBase {
     recovery_actions_.call(srv);
   }
 
+  bool StopMission() {
+    // TODO 
+  }
+
 
   /**
    * @brief      Go to a requested mission point
@@ -75,10 +79,10 @@ class TurbotAUV : public AuvBase {
     //srv.request.tolerance = go_to_tolerance_;
     if (srv_running_== false) {
       if (!client_goto_.call(srv)) { // call service for goto.
-        ROS_ERROR_STREAM("[MerbotsIbvsRecovery]: Failed to call service Go to with Yaw " ); //
+        ROS_ERROR_STREAM("Failed to call service Go to with Yaw " ); //
         return false;
       }
-      ROS_INFO_STREAM("[MerbotsIbvsRecovery]: Go to service called!");
+      ROS_INFO_STREAM("Go to service called!");
       srv_running_ = true; // indicates if goto is active.
       return true;
       // TODO
