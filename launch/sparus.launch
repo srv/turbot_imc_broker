@@ -1,6 +1,6 @@
 <launch>
 
-  <node pkg="ros_imc_broker" type="ros_imc_adapter_node" name="ros_imc_adapter_node" output="screen">
+  <node pkg="ros_imc_broker" type="ros_imc_adapter_node" name="ros_imc_adapter_node">
     <param name="system_name" value="sparus"/>
     <param name="system_type" value="uuv"/>
     <param name="system_imc_id" value="8193"/>
