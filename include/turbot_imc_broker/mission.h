@@ -1,3 +1,25 @@
+// The MIT License (MIT)
+
+// Copyright (c) 2017 Universitat de les Illes Balears
+
+//  Permission is hereby granted, free of charge, to any person obtaining a
+//  copy of this software and associated documentation files (the "Software"),
+//  to deal in the Software without restriction, including without limitation
+//  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+//  and/or sell copies of the Software, and to permit persons to whom the
+//  Software is furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in
+//  all copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+//  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+//  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+//  DEALINGS IN THE SOFTWARE.
+
 #ifndef MISSION_H
 #define MISSION_H
 
@@ -98,19 +120,23 @@ class Mission {
       // Each msg.maneuvers[i] is a PlanManeuver
       // the data part of the PlanManeuver is a Maneuver which inherits from InlineMessage,
       IMC::Maneuver* maneuver_msg = (*it)->data.get();
+      uint16_t maneuver_id = maneuver_msg->getId();
+      std::string maneuver_name = maneuver_msg->getName();
       //which has the get() method that returns the pointer to the message (maneuver).
       // message.hpp has a method called getName which returns the maneuver type
-      if (maneuver_msg->getName() == "Goto") {
+      if (maneuver_id == IMC::Goto::getIdStatic()) {
         IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
         push_back(*goto_msg);
-      } else if (maneuver_msg->getName() == "FollowPath") {
+      } else if (maneuver_id == IMC::FollowPath::getIdStatic()) {
         IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
         // store the Goto msg in the vector of points
         push_back(*fp_msg);
-      } else if (maneuver_msg->getName() == "StationKeeping") {
+      } else if (maneuver_id == IMC::StationKeeping::getIdStatic()) {
         IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
         // store the StationKeeping msg in the vector of points
         push_back(*sk_msg);
+      } else {
+        ROS_WARN_STREAM("Maneuver " << maneuver_name << " (" << maneuver_id << ") not implemented!");
       }
     }
   }
