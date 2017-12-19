@@ -216,12 +216,22 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
   if (msg.op == IMC::PlanControl::PC_START) {
     //! Start Plan.
     ROS_INFO("IMC::PlanControl START");
+    
+    if (!msg.arg.isNull()) {
+      // If arg exists: it's a quick plan
+      const IMC::Message* cmsg = msg.arg.get();
+      IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
+      IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
+      mission.parse(*plan_specification);
+    }
+
     for (size_t i = 0; i < mission.size(); i++) {
       Goto(mission.points[i]);
     }
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
     ROS_INFO("IMC::PlanControl STOP");
+    StopMission();
   } else if (msg.op == IMC::PlanControl::PC_LOAD) {
     //! Load Plan.
     ROS_INFO("IMC::PlanControl LOAD");
