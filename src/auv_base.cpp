@@ -120,6 +120,9 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
 }
 
 void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
+  // Copy message
+  nav_sts_ = *msg;
+
   IMC::EstimatedState imc_msg;
   imc_msg.setSource(params.auv_id);
   imc_msg.setSourceEntity(params.entity_id);
@@ -168,7 +171,6 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   imc_msg.vy = ned_velocity.y();
   imc_msg.vz = ned_velocity.z();
 
-  nav_sts_ = *msg;
   if (!nav_sts_received_) {
     nav_sts_received_ = true;
   }
@@ -176,6 +178,9 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
 }
 
 void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
+  // Copy message
+  plan_db_ = msg;
+
   if (msg.op == IMC::PlanDB::DBOP_SET) { // if planDB operation = 0, then the argument contains a Plan Specification in the structure of a type Message
     //! Example of possible implementation. NOT TESTED!
     ROS_INFO("IMC::PlanDB SET");
@@ -205,6 +210,8 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
 }
 
 void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
+  // Copy message
+  plan_control_ = msg;
 
   if (msg.op == IMC::PlanControl::PC_START) {
     //! Start Plan.
@@ -227,7 +234,6 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
 }
 
 void AuvBase::AbortCallback(const IMC::Abort& msg) {
-
   ROS_INFO("IMC::Abort message received!: EMERGENCY SURFACE");
   if (msg.getName() == "Abort")
     Abort();

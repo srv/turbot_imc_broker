@@ -41,10 +41,10 @@
 #include <IMC/Spec/PlanSpecification.hpp>
 #include <IMC/Spec/FollowPath.hpp>
 #include <IMC/Spec/PlanControlState.hpp>
-
-// Subscribers
 #include <IMC/Spec/PlanControl.hpp>
 #include <IMC/Spec/PlanDB.hpp>
+#include <IMC/Spec/PlanDBState.hpp>
+#include <IMC/Spec/PlanDBInformation.hpp>
 #include <IMC/Spec/Abort.hpp>
 
 class AuvBase { // parent class
@@ -191,7 +191,12 @@ class AuvBase { // parent class
   bool is_plan_loaded_;
 
   // IMC messages
+  IMC::PlanControl plan_control_;
   IMC::PlanControlState plan_control_state_;
+  IMC::PlanDB plan_db_;
+  IMC::PlanDBInformation plan_db_info_;
+  IMC::PlanDBState plan_db_state_;
+  IMC::PlanSpecification plan_specification_;
   IMC::VehicleState vehicle_state_;
 };
 
