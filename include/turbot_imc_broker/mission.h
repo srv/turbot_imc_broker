@@ -75,7 +75,7 @@ class Mission {
   }
 
   void push_back(const IMC::FollowPath& msg) {
-
+    ROS_WARN_STREAM("[turbot_imc_broker]: Not implemented!");
   }
 
   void push_back(const IMC::Goto& msg) {
@@ -99,7 +99,7 @@ class Mission {
                     << msg.lat << ", " << msg.lon << ")");
 
     double north, east, depth;
-    ned_->geodetic2Ned(msg.lat, msg.lon, 0.0, north, east, depth);
+    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
 
     MissionPoint point;
     point.north = north;

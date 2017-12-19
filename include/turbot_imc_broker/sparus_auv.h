@@ -63,6 +63,19 @@ public:
       recovery_actions_.call(srv);
     }
 
+
+    /**
+     * @brief      Stop the curent mission if any
+     *
+     * @return     true if successful to launch
+     */
+    bool StopMission() {
+      cola2_msgs::RecoveryAction srv;
+      srv.request.error_level = srv.request.ABORT_MISSION;
+      recovery_actions_.call(srv);
+    }
+
+
     /**
      * @brief      Go to a requested mission point
      *
