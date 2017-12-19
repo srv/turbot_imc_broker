@@ -61,11 +61,14 @@ class AuvBase { // parent class
 
   void LoadMission(const IMC::PlanSpecification& msg) {
     mission_.parse(msg);
+  
   }
 
   void StartMission() {
+    /*call the Goto method to start the vehicle motion.  
+    // element by element of list mission : call Goto */
     for (size_t i = 0; i < mission_.size(); i++) {
-      Goto(mission_.points[i]);
+      Goto(mission_.points[i]); // this method is different for Udg and UIB, implement in the son class.
     }
   }
 
@@ -74,7 +77,7 @@ class AuvBase { // parent class
   }
 
   virtual bool Abort() = 0;
-  virtual bool Goto(const MissionPoint& p) = 0;
+  virtual bool Goto(const MissionPoint& p) = 0; // send one goal point, specific for each different vehicle UdG or UIB
 
  protected:
   ros::NodeHandle nh_;
