@@ -114,6 +114,7 @@ class AuvBase { // parent class
   }
 
   virtual bool Abort() = 0;
+  virtual bool StopMission() = 0;
   virtual bool Goto(const MissionPoint& p) = 0;
 
   ros::NodeHandle nh;
