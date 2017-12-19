@@ -20,83 +20,81 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //  DEALINGS IN THE SOFTWARE.
 
-#include <turbot_imc_broker/turbot_imc_broker.h>
+#include <turbot_imc_broker/auv_base.h>
 
 #include <tf/tf.h>
 
-// IMC messages to use: classes will be IMC::MessageType
-#include <IMC/Spec/EstimatedState.hpp>
-#include <IMC/Spec/RhodamineDye.hpp>
-#include <IMC/Spec/VehicleState.hpp>
-#include <IMC/Spec/PlanControlState.hpp>
-#include <IMC/Spec/PlanSpecification.hpp>
-#include <IMC/Spec/PlanManeuver.hpp>
-#include <IMC/Spec/Goto.hpp>
-#include <IMC/Spec/StationKeeping.hpp>
-#include <IMC/Spec/FollowPath.hpp>
+#include <fstream>
 
+AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false) {
+  // Get parameters from parameter server
+  nh.param("outdir", params.outdir, std::string(""));
+  nh.param("filename", params.filename, std::string(""));
+  nh.param("auv_id", params.auv_id, 0x2000); // 8192
+  nh.param("entity_id", params.entity_id, 0xFF);  // LSTS said 255
+  nh.param<std::string>("system_name", params.system_name, std::string("turbot"));
+  nh.param<std::string>("outdir", params.outdir, std::string("/tmp"));
+  nh.param<std::string>("filename", params.filename, std::string("rhodamine.csv"));
 
-TurbotIMCBroker::TurbotIMCBroker() : nav_sts_received_(false),m_eta(0),
-        is_plan_loaded_(true) {
-  ros::NodeHandle nh("~");
+  // Plan control state default values
+  plan_control_state_.setSource(params.auv_id);
+  plan_control_state_.setSourceEntity(params.entity_id);
+  plan_control_state_.plan_eta = 0;
+  plan_control_state_.plan_progress = 0;
+  plan_control_state_.man_id = "";
+  // plan_control_state_.man_id ??;
+  plan_control_state_.man_eta = -1;
 
-  nh.param("outdir", params_.outdir, std::string(""));
-  nh.param("filename", params_.filename, std::string(""));
-  nh.param("auv_id", params_.auv_id, 0x2000); // 8192
-  nh.param("entity_id", params_.entity_id, 0xFF);  // LSTS said 255
-  nh.param<std::string>("system_name", params_.system_name, std::string("turbot"));
-  nh.param<std::string>("outdir", params_.outdir, std::string("/tmp"));
-  nh.param<std::string>("filename", params_.filename, std::string("rhodamine.csv"));
+  // Vehicle state default values
+  vehicle_state_.setSource(params.auv_id);
+  vehicle_state_.setSourceEntity(params.entity_id);
+
+  // the vehicle is in ready to service request
+  vehicle_state_.op_mode = IMC::VehicleState::VS_SERVICE;
+  vehicle_state_.maneuver_eta = 65535; // value when no maneuver
+
+  // still to define how to capture an error
+  vehicle_state_.error_count = 0;
+  vehicle_state_.error_ents = "no error";
+  vehicle_state_.maneuver_type = 0;
+  vehicle_state_.maneuver_stime = 0;
+  vehicle_state_.control_loops = 0x00000000;  // no use
+  vehicle_state_.flags = 0x00;  //0x01 when the maneuver is done, 0 elsewhere
+  vehicle_state_.last_error = "no error";
+  vehicle_state_.last_error_time = 0;
 
   // Advertise ROS or IMC/Out messages
   estimated_state_pub_ = nh.advertise<IMC::EstimatedState>("/IMC/Out/EstimatedState", 100);
   rhodamine_pub_ = nh.advertise<IMC::RhodamineDye>("/IMC/Out/RhodamineDye", 100);
   vehicle_state_pub_ = nh.advertise<IMC::VehicleState>("/IMC/Out/VehicleState", 100);
   plan_control_state_pub_ = nh.advertise<IMC::PlanControlState>("/IMC/Out/PlanControlState", 100);
-
-  // TODO IMC messages:
-  //  - PlanControl: Neptus sent, used to start and stop a plan, and send quick
-  //    plans to a vehicle (goto or Station keeping)
-  //  - Abort: Neptus sent, used in case of emergency to stop all activity on
-  //    the vehicle
-  //  - PlanDB: query by Neptus, used to interact with the vehicle, there are
-  //    internal IMC messages used that  are described on the definition of the
-  //    PlanDB message
-  //  - PlanSpecification: Mission plans. The following parameters can be
-  //    ignored: Namespace, Plan Variables, Start Actions, End Actions. A plan
-  //    has maneuvers (PlanManeuver, again the Start Actions and End Actions can
-  //    be ignored). The most basic maneuvers should be supported:
-  //    - Goto
-  //    - Follow Path
-  //    - Station keeping
+  plan_db_pub_ = nh.advertise<IMC::PlanDB>("/IMC/Out/PlanDB", 100);
+  plan_control_pub_ = nh.advertise<IMC::PlanControl>("/IMC/Out/PlanControl", 100);
 
   // Subscribe to ROS or IMC/In messages
-  abort_sub_ = nh.subscribe("/IMC/In/Abort", 1, &TurbotIMCBroker::AbortCallback, this);
-  plan_db_sub_ = nh.subscribe("/IMC/In/PlanDB", 1, &TurbotIMCBroker::PlanDBCallback, this);
-  plan_control_sub_ = nh.subscribe("/IMC/In/PlanControl", 1, &TurbotIMCBroker::PlanControlCallback, this);
+  abort_sub_ = nh.subscribe("/IMC/In/Abort", 1, &AuvBase::AbortCallback, this);
+  plan_db_sub_ = nh.subscribe("/IMC/In/PlanDB", 1, &AuvBase::PlanDBCallback, this);
+  plan_control_sub_ = nh.subscribe("/IMC/In/PlanControl", 1, &AuvBase::PlanControlCallback, this);
 
   // Topics to be renamed depending on vehicle
-  rhodamine_sub_ = nh.subscribe("rhodamine", 1, &TurbotIMCBroker::RhodamineCallback, this);
-  nav_sts_sub_ = nh.subscribe("nav_sts", 1, &TurbotIMCBroker::NavStsCallback, this);
+  rhodamine_sub_ = nh.subscribe("rhodamine", 1, &AuvBase::RhodamineCallback, this);
+  nav_sts_sub_ = nh.subscribe("nav_sts", 1, &AuvBase::NavStsCallback, this);
 
   // Create timers
-  timer_ = nh.createTimer(ros::Duration(1), &TurbotIMCBroker::Timer, this);
-
-  // Init AUV class
-  auv_.Init(params_.auv_id, params_.entity_id);
+  timer_ = nh.createTimer(ros::Duration(1), &AuvBase::Timer, this);
 }
 
-void TurbotIMCBroker::Timer(const ros::TimerEvent&) {
+void AuvBase::Timer(const ros::TimerEvent&) {
   if (!nav_sts_received_) return;
-  vehicle_state_pub_.publish(auv_.GetVehicleState());
-  plan_control_state_pub_.publish(auv_.GetPlanControlState());
+  vehicle_state_pub_.publish(GetVehicleState());
+  plan_control_state_pub_.publish(GetPlanControlState());
 }
 
-void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
+void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& msg){
   // publish rhodamine message
   IMC::RhodamineDye rhodamine_msg;
-  rhodamine_msg.setSource(params_.auv_id);
-  rhodamine_msg.setSourceEntity(params_.entity_id);
+  rhodamine_msg.setSource(params.auv_id);
+  rhodamine_msg.setSourceEntity(params.entity_id);
   rhodamine_msg.setTimeStamp(ros::Time::now().toSec());
   rhodamine_msg.value = static_cast<float>(msg->concentration_ppb);
   rhodamine_pub_.publish(rhodamine_msg);
@@ -108,7 +106,7 @@ void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineCo
   double depth = nav_sts_.position.depth;
 
   // Save data in CSV file, required for rsync
-  std::string csv_file = params_.outdir + "/" + params_.filename;
+  std::string csv_file = params.outdir + "/" + params.filename;
   std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
   f_csv << std::fixed << std::setprecision(6)
         << seconds << ","
@@ -121,10 +119,13 @@ void TurbotIMCBroker::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineCo
   f_csv.close();
 }
 
-void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
+void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
+  // Copy message
+  nav_sts_ = *msg;
+
   IMC::EstimatedState imc_msg;
-  imc_msg.setSource(params_.auv_id);
-  imc_msg.setSourceEntity(params_.entity_id);
+  imc_msg.setSource(params.auv_id);
+  imc_msg.setSourceEntity(params.entity_id);
   imc_msg.setTimeStamp(ros::Time::now().toSec());
 
   // NED origin
@@ -170,60 +171,70 @@ void TurbotIMCBroker::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   imc_msg.vy = ned_velocity.y();
   imc_msg.vz = ned_velocity.z();
 
-  nav_sts_ = *msg;
   if (!nav_sts_received_) {
     nav_sts_received_ = true;
   }
   estimated_state_pub_.publish(imc_msg);
 }
 
-void TurbotIMCBroker::PlanDBCallback(const IMC::PlanDB& msg) {
-  ROS_INFO("IMC::PlanDB message received!");
+void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
+  // Copy message
+  plan_db_ = msg;
 
   if (msg.op == IMC::PlanDB::DBOP_SET) { // if planDB operation = 0, then the argument contains a Plan Specification in the structure of a type Message
     //! Example of possible implementation. NOT TESTED!
+    ROS_INFO("IMC::PlanDB SET");
     const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
-    auv_.LoadMission(*plan_specification);
+    mission.parse(*plan_specification);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
+    ROS_INFO("IMC::PlanDB DELETE");
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
     // Should return PlanSpecification
+    ROS_INFO("IMC::PlanDB GET");
   } else if (msg.op == IMC::PlanDB::DBOP_GET_INFO) {
     // Should return PlanDBInformation
+    ROS_INFO("IMC::PlanDB GET INFO");
   } else if (msg.op == IMC::PlanDB::DBOP_CLEAR) {
     // Should delete all DB records
-    auv_.ClearMission();
+    ROS_INFO("IMC::PlanDB CLEAR");
+    mission.points.clear();
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
+    ROS_INFO("IMC::PlanDB GET STATE");
   } else {
     ROS_INFO("IMC::PlanDB operation not implemented");
   }
 }
 
-void TurbotIMCBroker::PlanControlCallback(const IMC::PlanControl& msg) {
-  ROS_INFO("IMC::PlanControl message received!");
+void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
+  // Copy message
+  plan_control_ = msg;
 
   if (msg.op == IMC::PlanControl::PC_START) {
     //! Start Plan.
-    auv_.StartMission();
+    ROS_INFO("IMC::PlanControl START");
+    for (size_t i = 0; i < mission.size(); i++) {
+      Goto(mission.points[i]);
+    }
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
+    ROS_INFO("IMC::PlanControl STOP");
   } else if (msg.op == IMC::PlanControl::PC_LOAD) {
     //! Load Plan.
+    ROS_INFO("IMC::PlanControl LOAD");
   } else if (msg.op == IMC::PlanControl::PC_GET) {
     //! Get Plan.
+    ROS_INFO("IMC::PlanControl GET");
   } else {
     ROS_INFO("IMC::PlanControl operation not implemented");
   }
 }
 
-
-void TurbotIMCBroker::AbortCallback(const IMC::Abort& msg) {
+void AuvBase::AbortCallback(const IMC::Abort& msg) {
   ROS_INFO("IMC::Abort message received!: EMERGENCY SURFACE");
   if (msg.getName() == "Abort")
-    auv_.Abort();
-
-  //! Stop mission and disable thrusters
+    Abort();
 }

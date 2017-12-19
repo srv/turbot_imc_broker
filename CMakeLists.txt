@@ -25,6 +25,7 @@ if(UIB)
      ros_imc_broker
      tf
      safety
+     control
    )
   add_definitions(-DUIB)
 elseif(UDG)
@@ -60,10 +61,23 @@ include_directories(
 add_library(ned src/ned.cpp)
 
 add_executable(${PROJECT_NAME}_node src/turbot_imc_broker_node.cpp
-                                    src/turbot_imc_broker.cpp)
+                                    src/auv_base.cpp)
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME}_node
   ned
   ${catkin_LIBRARIES}
 )
 
+## Mark executables and/or libraries for installation
+install(TARGETS ned ${PROJECT_NAME}_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+## Mark cpp header files for installation
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+)

@@ -20,11 +20,23 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //  DEALINGS IN THE SOFTWARE.
 
-#include <turbot_imc_broker/turbot_imc_broker.h>
+#ifdef UDG
+#include <turbot_imc_broker/sparus_auv.h>
+#endif
+#ifdef UIB
+#include <turbot_imc_broker/turbot_auv.h>
+#endif
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "turbot_imc_broker");
-  TurbotIMCBroker tb;
+
+  #ifdef UIB
+  TurbotAUV auv_;
+  #endif
+  #ifdef UDG
+  SparusAUV auv_;
+  #endif
+
   ros::MultiThreadedSpinner spinner(4);  // Use 4 threads
   spinner.spin();  // spin() will not return until the node has been shutdown
   return 0;
