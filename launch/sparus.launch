@@ -15,7 +15,7 @@
     <!--param name="multicast_port_range" value="5"/-->
 
     <!-- should match the Neptus comm port: 6001 (default) -->
-    <param name="static_destinations_addrs" value="127.0.0.1:6001"/>
+    <param name="static_destinations_addrs" value="192.168.0.217:6001"/>
   </node>
 
   <node pkg="turbot_imc_broker" type="turbot_imc_broker_node" name="turbot_imc_broker_node" output="screen">
