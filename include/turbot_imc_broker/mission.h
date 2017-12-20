@@ -76,6 +76,7 @@ class Mission {
 
   void push_back(const IMC::FollowPath& msg) {
     ROS_WARN_STREAM("[turbot_imc_broker]: FollowPath not implemented!");
+    // TODO
   }
 
   void push_back(const IMC::Goto& msg) {
@@ -90,6 +91,7 @@ class Mission {
     point.east = east;
     point.z = msg.z;
     point.yaw = msg.yaw;
+    point.duration = -1; // just in order to distinguish between goto and station keeping 
     point.speed = msg.speed;
     points.push_back(point);
   }

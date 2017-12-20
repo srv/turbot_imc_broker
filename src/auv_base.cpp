@@ -35,6 +35,7 @@ AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false) {
   nh.param<std::string>("system_name", params.system_name, std::string("turbot"));
   nh.param<std::string>("outdir", params.outdir, std::string("/tmp"));
   nh.param<std::string>("filename", params.filename, std::string("rhodamine.csv"));
+  nh.param("goto_tolerance", params.goto_tolerance, 40.0);
 
   // Plan control state default values
   plan_control_state_.setSource(params.auv_id);
@@ -84,6 +85,7 @@ AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false) {
   timer_ = nh.createTimer(ros::Duration(1), &AuvBase::Timer, this);
 }
 
+// timer interruption service routine
 void AuvBase::Timer(const ros::TimerEvent&) {
   if (!nav_sts_received_) return;
   vehicle_state_pub_.publish(GetVehicleState());
@@ -260,9 +262,10 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       const IMC::Message* cmsg = msg.arg.get();
       IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
-      mission.parse(*plan_specification);
+      mission.parse(*plan_specification); // store a list of goal points in a vector called mission
     }
-
+ // for each goal point in the list, call Goto method. These goals can be a 
+ // goto or a station keeping 
     for (size_t i = 0; i < mission.size(); i++) {
       Goto(mission.points[i]);
     }

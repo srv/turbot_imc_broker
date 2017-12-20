@@ -24,7 +24,7 @@
 #define TURBOT_AUV_H
 
 #include <turbot_imc_broker/auv_base.h>
-
+#include <std_srvs/Empty.h> // include the empty services for the enable keep position
 #include <control/Goto.h>
 #include <safety/RecoveryAction.h>
 #include <safety/MissionStatus.h>
@@ -38,7 +38,9 @@ class TurbotAUV : public AuvBase {
 
     ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
     recovery_actions_ = nh.serviceClient<safety::RecoveryAction>("/safety/recovery_action");
-    client_goto_ = nh.serviceClient<control::Goto>("/control/goto_local");
+    client_goto_ = nh.serviceClient<control::Goto>("/control/goto_local_block");
+    client_keep_position_ = nh.serviceClient<std_srvs::Empty>("/control/enable_keep_position"); 
+
     bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
     if (!is_available) {
       ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
@@ -70,22 +72,52 @@ class TurbotAUV : public AuvBase {
    * @return     true if successful
    */
   bool Goto(const MissionPoint& p) { // implement different versions for Udg and UIB
-    // Call goto service -> pendent acabar aixó  fbf 15/12/2017
-    control::Goto srv;
-    srv.request.north_lat = p.north;
-    srv.request.east_lon = p.east;
-    srv.request.z = p.z;
-    //srv.request.yaw = yaw; //take the yaw fro the Goto Maneuver
-    //srv.request.tolerance = go_to_tolerance_;
-    if (srv_running_== false) {
-      if (!client_goto_.call(srv)) { // call service for goto.
-        ROS_ERROR_STREAM("Failed to call service Go to with Yaw " ); //
-        return false;
-      }
-      ROS_INFO_STREAM("Go to service called!");
-      srv_running_ = true; // indicates if goto is active.
-      return true;
-      // TODO
+    // distinguish between goto and station keeping
+    if (p.duration > 0) // for station keeping , first goto to the desired location and then call keep position service.
+    {
+
+      control::Goto srv;
+      srv.request.north_lat = p.north;
+      srv.request.east_lon = p.east;
+      srv.request.z = p.z;
+      //srv.request.yaw = yaw; //take the yaw fro the Goto Maneuver
+      srv.request.tolerance = params.goto_tolerance;
+      if (srv_running_== false) { 
+          if (client_goto_.call(srv)) {  // bloking go to --> waits until the threat is terminated. the return 
+            // indicated the result of the Go to: goal reached = true, a problem = false. 
+            ROS_INFO_STREAM("Go to service called and motion to the goal point terminated !");
+            srv_running_ = true; // indicates that the station keeping is active.
+            std_srvs::Empty keep_position;
+            client_keep_position_.call(keep_position); // keep position. TODO: control the duration of the keep position
+            srv_running_ = false; // indicates that the station keeping is active.
+            return true;
+          }else{ // the go to service has had a problem
+            ROS_ERROR_STREAM("Failed to call service Go to " ); //
+            return false;
+          }
+
+        // TODO
+        } 
+        /* control if the vehicle is in the desired position is missing. Do the station keeping, only if the desired goal has been reached */
+      
+    }else{ // for simply goto. Do the goto only if the desired goal has been reached 
+
+      control::Goto srv;
+      srv.request.north_lat = p.north;
+      srv.request.east_lon = p.east;
+      srv.request.z = p.z;
+      srv.request.tolerance = params.goto_tolerance;
+      //srv.request.yaw = yaw; //take the yaw fro the Goto Maneuver
+      //srv.request.tolerance = go_to_tolerance_;
+      if (srv_running_== false) {
+          if (!client_goto_.call(srv)) { // call service for goto.
+            ROS_ERROR_STREAM("Failed to call service Go to with Yaw " ); //
+            return false;
+          }
+        ROS_INFO_STREAM("Go to service called!");
+        return true;
+        // TODO
+        }
     }
   }
 
@@ -117,6 +149,7 @@ class TurbotAUV : public AuvBase {
   bool is_plan_loaded_;
   ros::ServiceClient recovery_actions_;
   ros::ServiceClient client_goto_;
+  ros::ServiceClient client_keep_position_;
   bool srv_running_= false;
 };
 

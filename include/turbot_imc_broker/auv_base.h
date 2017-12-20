@@ -64,7 +64,8 @@ class AuvBase { // parent class
     std::string filename;      //!> CSV filename
     std::string system_name;   //!> AUV name
     int auv_id;                //!> AUV identifier
-    int entity_id;             //!> Entity identifier
+    int entity_id;   
+    double goto_tolerance;          //!> Entity identifier
     // Default settings
     Params () {
       outdir            = "/tmp";
