@@ -75,8 +75,28 @@ class Mission {
   }
 
   void push_back(const IMC::FollowPath& msg) {
-    ROS_WARN_STREAM("[turbot_imc_broker]: FollowPath not implemented!");
-    // TODO
+    ROS_INFO_STREAM("[turbot_imc_broker]: Folow Path (" 
+      << msg.lat << ", " << msg.lon << ")"); // lat and lon of stating point
+    double north, east, depth;
+    MissionPoint point;
+    // NED starting position 
+    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
+    // msg contains a list of Path Points. Extract each point and push it into
+    //the vector 'points'
+    // iterator for the message list of PathPoints
+    IMC::MessageList<IMC::PathPoint>::const_iterator it_fp; 
+    for (it_fp = msg.points.begin();
+         it_fp != msg.points.end(); it_fp++) { // for each PathPoint in the list 
+            float n = (*it_fp)->x + north;
+            float e = (*it_fp)->y + east;
+            float d = (*it_fp)->z + depth; // ofsets with respect the starting point
+            point.north = n;
+            point.east = e;
+            point.z = d;
+            point.duration = -1; // just in order to distinguish between goto and station keeping 
+            points.push_back(point);
+    }
+
   }
 
   void push_back(const IMC::Goto& msg) {
@@ -136,10 +156,9 @@ class Mission {
       // message.hpp has a method called getName which returns the maneuver type
       if (maneuver_id == IMC::Goto::getIdStatic()) {
         IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
-        push_back(*goto_msg);
+        push_back(*goto_msg);         // store the Goto msg in the vector of points
       } else if (maneuver_id == IMC::FollowPath::getIdStatic()) {
         IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
-        // store the Goto msg in the vector of points
         push_back(*fp_msg);
       } else if (maneuver_id == IMC::StationKeeping::getIdStatic()) {
         IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
