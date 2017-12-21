@@ -26,6 +26,7 @@ if(UIB)
      tf
      safety
      control
+     std_srvs
    )
   add_definitions(-DUIB)
 elseif(UDG)
