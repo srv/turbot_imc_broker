@@ -266,9 +266,8 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
     }
  // for each goal point in the list, call Goto method. These goals can be a 
  // goto or a station keeping 
-    for (size_t i = 0; i < mission.size(); i++) {
-      Goto(mission.points[i]);
-    }
+    PlayMission();
+
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
     ROS_INFO("IMC::PlanControl STOP");

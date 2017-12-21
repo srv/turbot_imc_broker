@@ -27,28 +27,44 @@
 #include <cola2_msgs/CaptainStatus.h>
 #include <cola2_msgs/RecoveryAction.h>
 #include <cola2_msgs/Goto.h>
-
+#include <boost/thread.hpp>
+#include <std_srvs/Empty.h>
 
 class SparusAUV : public AuvBase {
 
 public:
-    SparusAUV() : AuvBase(), is_plan_loaded_(false) {
+    SparusAUV() :
+            AuvBase(),
+            is_mission_aborted_(false),
+            current_step_(0) {
       plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1,
                                        &SparusAUV::CaptainStatusCallback, this);
 
 
-      ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
+      ROS_INFO_STREAM_THROTTLE(1, "[ turbot_imc_broker ] Waiting for safety service...");
       recovery_actions_ = nh.serviceClient<cola2_msgs::RecoveryAction>("/cola2_safety/recovery_action");
       bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
       if (!is_available) {
         ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
       }
 
-      ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for goto service...");
+      ROS_INFO_STREAM_THROTTLE(1, "[ turbot_imc_broker ] Waiting for goto service...");
       goto_srv_ = nh.serviceClient<cola2_msgs::Goto>("/cola2_control/enable_goto");
       is_available = goto_srv_.waitForExistence(ros::Duration(10));
       if (!is_available) {
         ROS_ERROR_STREAM("[ turbot_imc_broker ]: Goto service is not available.");
+      }
+
+      ROS_INFO_STREAM_THROTTLE(1, "[ turbot_imc_broker ] Waiting for captain services...");
+      enable_external_mission_ = nh.serviceClient<std_srvs::Empty>("/captain/enable_external_mission");
+      is_available = enable_external_mission_.waitForExistence(ros::Duration(10));
+      if (!is_available) {
+        ROS_ERROR_STREAM("[ turbot_imc_broker ]: Captain services are not available.");
+      }
+      disable_external_mission_ = nh.serviceClient<std_srvs::Empty>("/captain/disable_external_mission");
+      is_available = disable_external_mission_.waitForExistence(ros::Duration(10));
+      if (!is_available) {
+        ROS_ERROR_STREAM("[ turbot_imc_broker ]: Captain services are not available.");
       }
     }
 
@@ -73,6 +89,7 @@ public:
       cola2_msgs::RecoveryAction srv;
       srv.request.error_level = srv.request.ABORT_MISSION;
       recovery_actions_.call(srv);
+      is_mission_aborted_ = true;
     }
 
 
@@ -85,6 +102,8 @@ public:
      */
     bool Goto(const MissionPoint &p) {
       cola2_msgs::Goto srv;
+      srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_NED;
+      srv.request.priority = 10;
       srv.request.position.x = p.north;
       srv.request.position.y = p.east;
       srv.request.position.z = p.z;
@@ -105,8 +124,6 @@ public:
       srv.request.linear_velocity.x = p.speed;
       srv.request.blocking = true;
       srv.request.keep_position = false;
-      srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_NED;
-      srv.request.priority = 10;
       if (p.duration > 0) {
         srv.request.keep_position = true;
         srv.request.timeout = p.duration;
@@ -114,7 +131,35 @@ public:
       goto_srv_.call(srv);
     }
 
+    /**
+     * @brief      Play current mission if a mission is defined
+     *
+     * @return     true if successful
+    */
+    bool PlayMission() {
+      if (mission.size() == 0) {
+        ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
+        return false;
+      }
+      boost::thread *t;
+      t = new boost::thread(&SparusAUV::PlayMissionThread, this);
+    }
+
 private:
+    void PlayMissionThread() {
+      std_srvs::Empty srv;
+      enable_external_mission_.call(srv);
+      for (size_t i = 0; i < mission.size(); i++) {
+        current_step_++;
+        if (not is_mission_aborted_) {
+          Goto(mission.points[i]);
+        }
+      }
+      current_step_ = 0;
+      is_mission_aborted_ = false;
+      disable_external_mission_.call(srv);
+    }
+
     void CaptainStatusCallback(const cola2_msgs::CaptainStatus& msg) {
       // Default values
       plan_control_state_.plan_eta = 0;
@@ -125,15 +170,24 @@ private:
 
       if (msg.mission_active) { // A plan is under execution
         plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
-        plan_control_state_.plan_eta = msg.total_steps * TIME_PER_MISSION_STEP;
-        plan_control_state_.plan_progress = int((float(msg.current_step)/float(msg.total_steps))*100);
-        plan_control_state_.man_id = std::to_string(msg.current_step);
+
+        // Check if is a normal cola2 plan or an external mission (Neptus one)
+        int mission_steps = msg.total_steps;
+        int current = msg.current_step;
+        if (mission_steps < 0) {
+          mission_steps = mission.size();
+          current = current_step_;
+        }
+
+        plan_control_state_.plan_progress = int((float(current)/float(mission_steps))*100);
+        plan_control_state_.plan_eta = mission_steps * TIME_PER_MISSION_STEP;
+        plan_control_state_.man_id = std::to_string(current);
         // plan_control_state.man_id ??;
         plan_control_state_.man_eta = -1;
       }
       else { // No plan under execution ...
-        if (msg.active_controller == 0) { // ... and no actions are being executed ...
-          if (is_plan_loaded_) { // ... and a plan is loaded.
+        if (msg.active_controller == cola2_msgs::CaptainStatus::CONTROLLER_NONE) { // ... and no actions are being executed ...
+          if (mission.size() > 0) { // ... and a plan is loaded.
             plan_control_state_.state = IMC::PlanControlState::PCS_READY;
           }
           else { // ... and no plan is loaded.
@@ -144,7 +198,7 @@ private:
           plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
         }
       }
-      if (is_plan_loaded_) {
+      if (mission.size() > 0) {
         plan_control_state_.plan_id = "last_plan";
       }
       else {
@@ -153,9 +207,12 @@ private:
       plan_control_state_.last_outcome = plan_control_state_.state;
     }
 
-    bool is_plan_loaded_;
+    bool is_mission_aborted_;
+    unsigned int current_step_;
     ros::ServiceClient recovery_actions_;
     ros::ServiceClient goto_srv_;
+    ros::ServiceClient enable_external_mission_;
+    ros::ServiceClient disable_external_mission_;
 };
 
 #endif // SPARUS_AUV_H

@@ -121,6 +121,23 @@ class TurbotAUV : public AuvBase {
     }
   }
 
+    /**
+     * @brief      Play current mission if a mission is defined
+     *
+     * @return     true if successful
+     */
+    bool PlayMission() {
+      if (mission.size() == 0) {
+        ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
+        return false;
+      }
+      for (size_t i = 0; i < mission.size(); i++) {
+        Goto(mission.points[i]);
+      }
+    }
+
+
+
  private:
   void MissionStatusCallback(const safety::MissionStatus& msg) {
     if (msg.current_wp > 0) { // A plan is under execution

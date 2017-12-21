@@ -13,6 +13,7 @@ set(UDG OFF)
 #)
 
 find_package(Eigen3 REQUIRED)
+find_package(Boost REQUIRED COMPONENTS thread)
 
 if(UIB)
   message("------------------")
@@ -45,6 +46,7 @@ elseif(UDG)
 endif(UIB)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+SET(BOOST_THREAD -lboost_thread)
 
 catkin_package(
   LIBRARIES ned
@@ -57,6 +59,7 @@ include_directories(
   src/md5
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${Boost_INCLUDE_DIRS}
 )
 
 add_library(ned src/ned.cpp)
@@ -69,6 +72,7 @@ target_link_libraries(${PROJECT_NAME}_node
   ned
   md5
   ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
 )
 
 ## Mark executables and/or libraries for installation
