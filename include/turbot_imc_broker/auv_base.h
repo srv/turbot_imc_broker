@@ -125,9 +125,11 @@ class AuvBase { // parent class
     return vehicle_state_;
   }
 
+
   virtual bool Abort() = 0;
   virtual bool StopMission() = 0;
   virtual bool Goto(const MissionPoint& p) = 0;
+  virtual bool PlayMission() = 0;
 
   ros::NodeHandle nh;
   Mission mission;  //!> Stores PlanDB missions.

@@ -268,9 +268,8 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
  // goto (duration=-1) or a station keeping (duration != -1).
  // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored. 
 // if the PlanSpecification contains a Follow Path, a list of points is stored.  
-    for (size_t i = 0; i < mission.size(); i++) {
-      Goto(mission.points[i]);
-    }
+ // goto or a station keeping 
+    PlayMission();
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
     ROS_INFO("IMC::PlanControl STOP");
