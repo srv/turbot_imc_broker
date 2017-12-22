@@ -86,7 +86,7 @@ AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false) {
 }
 
 // timer interruption service routine
-void AuvBase::Timer(const ros::TimerEvent& ) {
+void AuvBase::Timer(const ros::TimerEvent&) {
   if (!nav_sts_received_) return;
   vehicle_state_pub_.publish(GetVehicleState());
   plan_control_state_pub_.publish(GetPlanControlState());
@@ -211,7 +211,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     // Should delete all DB records
     ROS_INFO("IMC::PlanDB CLEAR");
     plan_db_.arg.clear();
-    mission.points.clear();
+    mission.points_.clear();
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
     ROS_INFO("IMC::PlanDB GET STATE");
@@ -264,11 +264,11 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
       mission.parse(*plan_specification); // store a list of goal points in a vector called mission
     }
- // for each goal point in the list, call Goto method. These goals can be a 
- // goto (duration=-1) or a station keeping (duration != -1).
- // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored. 
-// if the PlanSpecification contains a Follow Path, a list of points is stored.  
- // goto or a station keeping 
+  // for each goal point in the list, call Goto method. These goals can be a
+  // goto (duration=-1) or a station keeping (duration != -1).
+  // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored.
+  // if the PlanSpecification contains a Follow Path, a list of points is stored.
+  // goto or a station keeping
     PlayMission();
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.

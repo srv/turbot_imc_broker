@@ -90,13 +90,13 @@ class Mission {
             float n = (*it_fp)->x + north;
             float e = (*it_fp)->y + east;
             float d = (*it_fp)->z + depth; // ofsets with respect the starting point
+            ROS_INFO_STREAM("[turbot_imc_broker]: Add path waypoint at " << n << ", " << e << ", " << d << ".");
             point.north = n;
             point.east = e;
             point.z = d;
             point.duration = -1; // just in order to distinguish between goto and station keeping 
-            points.push_back(point);
+            points_.push_back(point);
     }
-
   }
 
   void push_back(const IMC::Goto& msg) {
@@ -113,7 +113,7 @@ class Mission {
     point.yaw = msg.yaw;
     point.duration = -1; // just in order to distinguish between goto and station keeping 
     point.speed = msg.speed;
-    points.push_back(point);
+    points_.push_back(point);
   }
 
   void push_back(const IMC::StationKeeping& msg) {
@@ -131,13 +131,13 @@ class Mission {
     point.speed = msg.speed;
     point.duration = msg.duration;
     point.radius = msg.radius;
-    points.push_back(point);
+    points_.push_back(point);
   }
 
   void parse(const IMC::PlanSpecification& msg) {
 
     // Delete previous mission
-    points.clear();
+    points_.clear();
 
     raw_msg_ = msg;
 
@@ -179,10 +179,10 @@ class Mission {
   }
 
   size_t size() const {
-    return points.size();
+    return points_.size();
   }
 
-  std::vector<MissionPoint> points;
+  std::vector<MissionPoint> points_;
  private:
   IMC::PlanSpecification raw_msg_;
   Ned* ned_;

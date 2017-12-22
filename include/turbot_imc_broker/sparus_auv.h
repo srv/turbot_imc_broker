@@ -159,7 +159,7 @@ private:
       current_step_++;
       if (not is_mission_aborted_)
       {
-        Goto(mission.points[i]);
+        Goto(mission.points_[i]);
       }
     }
     current_step_ = 0;
