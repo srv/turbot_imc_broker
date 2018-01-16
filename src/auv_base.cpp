@@ -192,7 +192,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    mission.parse(*plan_specification);
+    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points)
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
@@ -223,7 +223,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
   }
 
   // Publish reply
-  plan_db_pub_.publish(plan_db_);
+  plan_db_pub_.publish(plan_db_); // publish a reply of the received plan db
 }
 
 IMC::PlanDBState AuvBase::CreateState(const IMC::PlanSpecification& spec) {
@@ -258,7 +258,7 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
     ROS_INFO("IMC::PlanControl START");
 
     if (!msg.arg.isNull()) {
-      // If arg exists: it's a quick plan
+      // If arg exists: it's a quick plan. This will be the plan to be executed
       const IMC::Message* cmsg = msg.arg.get();
       IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
@@ -269,16 +269,16 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
  // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored. 
 // if the PlanSpecification contains a Follow Path, a list of points is stored.  
  // goto or a station keeping 
-    PlayMission();
+    PlayMission(); // if Plan_Control_arg is null, run the specification recovered from the Plan DB. 
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
     ROS_INFO("IMC::PlanControl STOP");
     StopMission();
   } else if (msg.op == IMC::PlanControl::PC_LOAD) {
-    //! Load Plan.
+    //! Load Plan. TODO
     ROS_INFO("IMC::PlanControl LOAD");
   } else if (msg.op == IMC::PlanControl::PC_GET) {
-    //! Get Plan.
+    //! Get Plan. TODO
     ROS_INFO("IMC::PlanControl GET");
   } else {
     ROS_INFO("IMC::PlanControl operation not implemented");
