@@ -51,8 +51,12 @@
 
 #define TIME_PER_MISSION_STEP   100
 
-static std::vector<char> ComputeMD5(const std::string& s) {
-  MD5 md5(s);
+static std::vector<char> ComputeMD5(const IMC::PlanSpecification& spec) {
+  uint8_t* buffer;
+  buffer = spec.serializeFields(buffer);
+  size_t bsize = spec.getPayloadSerializationSize();
+  std::string buffer_str(buffer, buffer+bsize);
+  MD5 md5(buffer_str);
   std::string md5_str = md5.hexdigest();
   std::vector<char> md5_vec(md5_str.begin(), md5_str.end());
   return md5_vec;
@@ -64,7 +68,7 @@ class AuvBase { // parent class
     std::string filename;      //!> CSV filename
     std::string system_name;   //!> AUV name
     int auv_id;                //!> AUV identifier
-    int entity_id;   
+    int entity_id;
     double goto_tolerance;          //!> Entity identifier
     // Default settings
     Params () {

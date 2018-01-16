@@ -108,6 +108,8 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
   double depth = nav_sts_.position.depth;
 
   // Save data in CSV file, required for rsync
+  // TODO split the file for each mission, ordered by date
+  // split the file when mission is over.
   std::string csv_file = params.outdir + "/" + params.filename;
   std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
   f_csv << std::fixed << std::setprecision(6)
@@ -192,7 +194,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    mission.parse(*plan_specification);
+    mission.parse(*plan_specification);  // TODO should be able to modify
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
@@ -234,7 +236,7 @@ IMC::PlanDBState AuvBase::CreateState(const IMC::PlanSpecification& spec) {
   state.change_sid = spec.getSourceEntity();
   state.change_sname = spec.getName();  // TODO: change for source name. Neptus?
   state.plans_info.push_back(CreateInfo(spec));
-  state.md5 = ComputeMD5(spec.toString());
+  state.md5 = ComputeMD5(spec);
   return state;
 }
 
@@ -245,7 +247,7 @@ IMC::PlanDBInformation AuvBase::CreateInfo(const IMC::PlanSpecification& spec) {
   info.change_time = spec.getTimeStamp();
   info.change_sid = spec.getSourceEntity();
   info.change_sname = spec.getName();  // TODO: change for source name. Neptus?
-  info.md5 = ComputeMD5(spec.toString());
+  info.md5 = ComputeMD5(spec);
   return info;
 }
 
