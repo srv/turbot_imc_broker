@@ -75,7 +75,7 @@ class Mission {
   }
 
   void push_back(const IMC::FollowPath& msg) {
-    ROS_INFO_STREAM("[turbot_imc_broker]: Folow Path (" 
+    ROS_INFO_STREAM("[turbot_imc_broker]: Store Follow Path starting point (" 
       << msg.lat << ", " << msg.lon << ")"); // lat and lon of stating point
     double north, east, depth;
     MissionPoint point;
@@ -84,19 +84,20 @@ class Mission {
     // msg contains a list of Path Points. Extract each point and push it into
     //the vector 'points'
     // iterator for the message list of PathPoints
-    IMC::MessageList<IMC::PathPoint>::const_iterator it_fp; 
+  //  std::cout << "[turbot_imc_broker]: Follow Path. Points " << *msg.points.end() ;
+    IMC::MessageList<IMC::PathPoint>::const_iterator it_fp;
     for (it_fp = msg.points.begin();
          it_fp != msg.points.end(); it_fp++) { // for each PathPoint in the list 
             float n = (*it_fp)->x + north;
             float e = (*it_fp)->y + east;
             float d = (*it_fp)->z + depth; // ofsets with respect the starting point
+            ROS_INFO_STREAM("[turbot_imc_broker]: Follow Path. Add path waypoint at " << n << ", " << e << ", " << d << ".");
             point.north = n;
             point.east = e;
             point.z = d;
             point.duration = -1; // just in order to distinguish between goto and station keeping 
-            points.push_back(point);
+            points_.push_back(point);
     }
-
   }
 
   void push_back(const IMC::Goto& msg) {
@@ -113,7 +114,7 @@ class Mission {
     point.yaw = msg.yaw;
     point.duration = -1; // just in order to distinguish between goto and station keeping 
     point.speed = msg.speed;
-    points.push_back(point);
+    points_.push_back(point);
   }
 
   void push_back(const IMC::StationKeeping& msg) {
@@ -131,13 +132,13 @@ class Mission {
     point.speed = msg.speed;
     point.duration = msg.duration;
     point.radius = msg.radius;
-    points.push_back(point);
+    points_.push_back(point);
   }
 
   void parse(const IMC::PlanSpecification& msg) {
 
     // Delete previous mission
-    points.clear();
+    points_.clear();
 
     raw_msg_ = msg;
 
@@ -179,10 +180,10 @@ class Mission {
   }
 
   size_t size() const {
-    return points.size();
+    return points_.size();
   }
 
-  std::vector<MissionPoint> points;
+  std::vector<MissionPoint> points_;
  private:
   IMC::PlanSpecification raw_msg_;
   Ned* ned_;

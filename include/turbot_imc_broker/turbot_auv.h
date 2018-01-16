@@ -175,7 +175,7 @@ void Timer_keep_pos(const ros::TimerEvent&) {
       }
 
       for (size_t i = 0; i < mission.size(); i++) {
-        Goto(mission.points[i]);
+        Goto(mission.points_[i]);
       }
     }
 
