@@ -35,7 +35,7 @@ AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false) {
   nh.param<std::string>("system_name", params.system_name, std::string("turbot"));
   nh.param<std::string>("outdir", params.outdir, std::string("/tmp"));
   nh.param<std::string>("filename", params.filename, std::string("rhodamine.csv"));
-  nh.param("goto_tolerance", params.goto_tolerance, 40.0);
+  nh.param("goto_tolerance", params.goto_tolerance, 5.0);
 
   // Plan control state default values
   plan_control_state_.setSource(params.auv_id);
@@ -184,40 +184,54 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
 void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
   // Copy message
   plan_db_ = msg;
-
   plan_db_.type = IMC::PlanDB::DBT_SUCCESS;
-
   if (msg.op == IMC::PlanDB::DBOP_SET) { // if planDB operation = 0, then the argument contains a Plan Specification in the structure of a type Message
     //! Example of possible implementation. NOT TESTED!
     ROS_INFO("IMC::PlanDB SET");
-    const IMC::Message* cmsg = msg.arg.get(); // obtain data and cast into a constant pointer type Message
+    const IMC::Message* cmsg = msg.arg.get(); // obtain specification data and cast into a constant pointer type Message
+    if (!msg.plan_id.empty()) {
+      plan_id_ = msg.plan_id; // the plan_id needs to be stored in order to recuperated when a PlanDB GET STATE is received. 
+      ROS_INFO_STREAM("[turbot_imc_broker]: Received Plan DB with plan ID: " << plan_db_.plan_id);
+    } else {
+      plan_db_.plan_id = "No Plan DB ID Received";
+      ROS_INFO("[turbot_imc_broker]: Received Plan DB without plan ID");
+    }
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) TODO should be able to modify
+    is_plan_loaded_ = mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) TODO should be able to modify
+    ROS_INFO_STREAM("[turbot_imc_broker]: Result of Plan DB Load: " << is_plan_loaded_);
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
     ROS_INFO("IMC::PlanDB DELETE");
     plan_db_.arg.clear();
+    mission.points_.clear();
+    is_plan_loaded_ = false; 
+    plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
     // Should return PlanSpecification
     ROS_INFO("IMC::PlanDB GET");
+    plan_db_.plan_id = plan_id_ ; 
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_GET_INFO) {
     // Should return PlanDBInformation
     ROS_INFO("IMC::PlanDB GET INFO");
     IMC::PlanDBInformation info = CreateInfo(plan_specification_);
+    plan_db_.plan_id = plan_id_;
     plan_db_.arg.set(info);
   } else if (msg.op == IMC::PlanDB::DBOP_CLEAR) {
     // Should delete all DB records
     ROS_INFO("IMC::PlanDB CLEAR");
     plan_db_.arg.clear();
     mission.points_.clear();
+    is_plan_loaded_ = false; 
+    plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
     ROS_INFO("IMC::PlanDB GET STATE");
     IMC::PlanDBState state = CreateState(plan_specification_);
+    plan_db_.plan_id = plan_id_; 
     plan_db_.arg.set(state);
   } else {
     ROS_INFO("IMC::PlanDB operation not implemented");
@@ -236,7 +250,7 @@ IMC::PlanDBState AuvBase::CreateState(const IMC::PlanSpecification& spec) {
   state.change_sid = spec.getSourceEntity();
   state.change_sname = spec.getName();  // TODO: change for source name. Neptus?
   state.plans_info.push_back(CreateInfo(spec));
-  state.md5 = ComputeMD5(spec);
+  state.md5 = ComputeMD5(state);
   return state;
 }
 
@@ -254,17 +268,17 @@ IMC::PlanDBInformation AuvBase::CreateInfo(const IMC::PlanSpecification& spec) {
 void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
   // Copy message
   plan_control_ = msg;
-
   if (msg.op == IMC::PlanControl::PC_START) {
     //! Start Plan.
     ROS_INFO("IMC::PlanControl START");
-
     if (!msg.arg.isNull()) {
       // If arg exists: it's a quick plan. This will be the plan to be executed
       const IMC::Message* cmsg = msg.arg.get();
       IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
-      mission.parse(*plan_specification); // store a list of goal points in a vector called mission
+      is_plan_loaded_ = mission.parse(*plan_specification); // store a list of goal points in a vector called mission
+      plan_db_.arg.set(plan_specification_);
+      plan_db_.plan_id= msg.plan_id;
     }
  // for each goal point in the list, call Goto method. These goals can be a 
  // goto (duration=-1) or a station keeping (duration != -1).
@@ -285,6 +299,7 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
   } else {
     ROS_INFO("IMC::PlanControl operation not implemented");
   }
+  plan_db_pub_.publish(plan_db_); // publish a reply of the received plan db, now from a Plan Control 
 }
 
 void AuvBase::AbortCallback(const IMC::Abort& msg) {

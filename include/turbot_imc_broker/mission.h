@@ -101,7 +101,7 @@ class Mission {
   }
 
   void push_back(const IMC::Goto& msg) {
-    ROS_INFO_STREAM("[turbot_imc_broker]: Goto ("
+    ROS_INFO_STREAM("[turbot_imc_broker]: Storing Goto message ("
                     << msg.lat << ", " << msg.lon << ")");
     double north, east, depth;
     ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
@@ -118,8 +118,8 @@ class Mission {
   }
 
   void push_back(const IMC::StationKeeping& msg) {
-    ROS_INFO_STREAM("[turbot_imc_broker]: StationKeeping ("
-                    << msg.lat << ", " << msg.lon << ")");
+    ROS_INFO_STREAM("[turbot_imc_broker]: Storing StationKeeping message at: ("
+                    << msg.lat << ", " << msg.lon << ")" << " of duration: " << msg.duration);
 
     double north, east, depth;
     ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
@@ -135,21 +135,23 @@ class Mission {
     points_.push_back(point);
   }
 
-  void parse(const IMC::PlanSpecification& msg) {
+  bool parse(const IMC::PlanSpecification& msg) {
 
     // Delete previous mission
     points_.clear();
-
+    bool is_plan_loaded = false;
     raw_msg_ = msg;
 
     // define it as a variable type const_iterator defined in the MessaList class,
     IMC::MessageList<IMC::PlanManeuver>::const_iterator it;
     // the PlanSpecification has a MessageList of PlanManeuver called maneuvers,
     // and the MessageList defines the cons_iterator
+    int cont=0;
     for (it = msg.maneuvers.begin();
          it != msg.maneuvers.end(); it++) {
       // Each msg.maneuvers[i] is a PlanManeuver
       // the data part of the PlanManeuver is a Maneuver which inherits from InlineMessage,
+      cont++;
       IMC::Maneuver* maneuver_msg = (*it)->data.get();
       uint16_t maneuver_id = maneuver_msg->getId();
       std::string maneuver_name = maneuver_msg->getName();
@@ -168,6 +170,10 @@ class Mission {
       } else {
         ROS_WARN_STREAM("Maneuver " << maneuver_name << " (" << maneuver_id << ") not implemented!");
       }
+    if (cont > 0) {
+      is_plan_loaded=true;
+      return is_plan_loaded;
+      } // plan loaded -- consider = true if a list of goal points is loaded into the mission vector.  
     }
   }
 

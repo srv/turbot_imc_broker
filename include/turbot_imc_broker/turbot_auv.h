@@ -28,24 +28,24 @@
 #include <control/Goto.h>
 #include <safety/RecoveryAction.h>
 #include <safety/MissionStatus.h>
+#include <boost/thread.hpp>
 
 
 class TurbotAUV : public AuvBase {
  public:
-  TurbotAUV() : AuvBase(), is_plan_loaded_(false) {
+  TurbotAUV() : AuvBase(), srv_stationkeeping_(false), srv_running_(false) {
     plan_status_sub_ = nh.subscribe("/control/mission_status", 1 ,
                                     &TurbotAUV::MissionStatusCallback, this);
     bool oneshot;
     ROS_INFO_STREAM_THROTTLE(1, "[AUV:] Waiting for safety service...");
     recovery_actions_ = nh.serviceClient<safety::RecoveryAction>("/safety/recovery_action");
     client_goto_block_ = nh.serviceClient<control::Goto>("/control/goto_local_block");
-    client_goto_= nh.serviceClient<control::Goto>("/control/goto_local");
     client_enable_keep_position_ = nh.serviceClient<std_srvs::Empty>("/control/enable_keep_position"); 
     client_disable_keep_position_ = nh.serviceClient<std_srvs::Empty>("/control/disable_keep_position"); 
     client_disable_goto_ = nh.serviceClient<std_srvs::Empty>("/control/disable_goto"); 
 
     // create one shot timer, it fires only ones until is rescheduled again with a start()
-    timer_keep_pos_ = nh.createTimer(ros::Duration(t_station_keeping), &TurbotAUV::Timer_keep_pos, this, oneshot = true);
+   // timer_keep_pos_ = nh.createTimer(ros::Duration(t_station_keeping), &TurbotAUV::Timer_keep_pos, this, oneshot = true);
     bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
     if (!is_available) {
       ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
@@ -70,27 +70,35 @@ class TurbotAUV : public AuvBase {
   bool StopMission() {
     // it comes from a PlanControl. The Plan Specification carried on a Plan Control 
     // can be a GOTO or a station keeping. At the moment, only controlled if GOTO.
-    if (srv_running_){
-    ROS_INFO("STOPING GOTO MISSION");
+    //if (srv_running_){
+    ROS_INFO("[turbot_imc_broker]: STOPPING PLAN");
+    stopped_=true;
+    if (srv_running_) {
+    ROS_INFO("[turbot_imc_broker]: STOPPING GOTO MISSION");
     std_srvs::Empty disable_goto; 
     client_disable_goto_.call(disable_goto); // dissable the goto maneuver
     srv_running_=false;
-    }  
+    }
+    //}  
     if(srv_stationkeeping_){
+      ROS_INFO("[turbot_imc_broker]: STOPPING STATION KEEPING MISSION");
       std_srvs::Empty disable_keep_position; 
       client_disable_keep_position_.call(disable_keep_position); // dissable the station keeping}
+      srv_stationkeeping_=false; 
+      // variable stopped is not unset here, but in the Goto process. 
+      // the problem is that, if we unset it here, in the Goto Subrutine will be unset, when it needs to be set. 
     }
-}
+  }
 
 // timer interruption service routine for keep position disabling: fires after 
   // the programmed duration 
-void Timer_keep_pos(const ros::TimerEvent&) {
-  ROS_INFO("FINISHING THE STATION KEEPING MANEUVER");
-  srv_running_ = false; // indicates that the station keeping is inactive.
-  std_srvs::Empty disable_keep_position; 
-  client_disable_keep_position_.call(disable_keep_position); // dissable the station keeping
-  srv_stationkeeping_=false;
-}
+  void FinishKeepPos() {
+      ROS_INFO("[turbot_imc_broker]: FINISHING THE STATION KEEPING MANEUVER");
+      srv_running_ = false; // indicates that the station keeping is inactive.
+      std_srvs::Empty disable_keep_position; 
+      client_disable_keep_position_.call(disable_keep_position); // dissable the station keeping
+      srv_stationkeeping_=false;
+  }
 
   /**
    * @brief      Go to a requested mission point
@@ -102,63 +110,81 @@ void Timer_keep_pos(const ros::TimerEvent&) {
    */
   bool Goto(const MissionPoint& p) { // implement different versions for Udg and UIB
     // distinguish between goto and station keeping
-    if (p.duration > (-1)) // for station keeping , first goto to the desired location and then call keep position service.
-      // ALERT !! duration in seconds = 0 for unlimited
-    {
-
       control::Goto srv;
       srv.request.north_lat = p.north;
       srv.request.east_lon = p.east;
       srv.request.z = p.z;
+      srv.request.tolerance = params.goto_tolerance;
+
+    ROS_INFO_STREAM("[turbot_imc_broker]: call to GOTO subrutine, duration:" << p.duration);
+    if (p.duration > -1) { // for station keeping , first goto to the desired location and then call keep position service.
+      // ALERT !! duration in seconds = 0 for unlimited
+      ROS_INFO_STREAM("[Station Keeping]: GOTO to the goal point !");
       //srv.request.yaw = yaw; //take the yaw fro the Goto Maneuver
       srv.request.tolerance = params.goto_tolerance;
-      if (srv_running_== false) {  // goes to a point and once it is at the desired position, it does a station keeping.
-          if (client_goto_block_.call(srv)) {  // bloking go to --> waits until the threat is terminated. the return 
-            // indicates the result of the Go to: goal reached = true, a problem = false. 
-            srv_running_ = true;
-            ROS_INFO_STREAM("GOTO service called and motion to the goal point terminated !");
-            std_srvs::Empty keep_position;
-            ROS_INFO_STREAM("Enable KEEP POSITION !");
-            client_enable_keep_position_.call(keep_position); // enable keep position. 
-            srv_running_=false;
-            srv_stationkeeping_=true;
-            if (p.duration > 0) // keep position of limited duration
-              {
-              t_station_keeping=p.duration; //set the duration of the station keeping time
-              timer_keep_pos_.start(); // start oneshot couter for keep position duration. 
-              }
-            //if duration = 0 --> unlimited time until a stop mission is requested  
-            return true;
-          }else{ // the go to service has had a problem
-            ROS_ERROR_STREAM("Failed to call service GOTO " ); //
-            return false;
+      // goes to a point and once it is at the desired position, it does a station keeping.
+      srv_running_=true;
+      if (client_goto_block_.call(srv)) {  // init bloking go to --> waits until the threat is terminated. the return 
+        // indicates the result of the Go to: goal reached = true, a problem = false. 
+        if (!stopped_) { // if the mission is stoped before it reaches the goal point this variable is set in another threat
+        // and the call service returns before the vehicle reaches the goal.  
+          ROS_INFO_STREAM("[Station Keeping]: GOTO to the goal point terminated !");
+          std_srvs::Empty keep_position;
+          ROS_INFO_STREAM("[Station Keeping]: Enable KEEP POSITION !");
+          client_enable_keep_position_.call(keep_position); // enable no blocking keep position. 
+          srv_running_=false;
+          srv_stationkeeping_=true;
+          if (p.duration > 0) { // keep position of limited duration. If duration=0 --> unlimited 
+          
+            t_station_keeping=p.duration; //set the duration of the station keeping time
+            ros::Duration(t_station_keeping).sleep(); // sleep for t_station_keeping seconds
+            FinishKeepPos(); // finish station keeping. 
           }
+        //if duration = 0 --> unlimited time until a stop mission is requested  
+          return true;
+        } else { // mission stopped during the Goto
+          ROS_INFO_STREAM("[Station Keeping]: Mission Stoped before the AUV reached the Goal Point");
+          stopped_ = false;
+          srv_running_=true;
+          return false;
+        }
+
+      } else { // the go to service has had a problem
+        ROS_ERROR_STREAM("[Station Keeping]: Failed to call service GOTO " ); //
+        srv_running_=false;
+        return false;
+      }
 
         // TODO
-        } 
+      
         /* control if the vehicle is in the desired position is missing. Do the station keeping, only if the desired goal has been reached */
       
-    }else{ // for simply goto. Do the goto only if the desired goal has been reached 
-
-      control::Goto srv;
-      srv.request.north_lat = p.north;
-      srv.request.east_lon = p.east;
-      srv.request.z = p.z;
-      srv.request.tolerance = params.goto_tolerance;
-      //srv.request.yaw = yaw; //take the yaw fro the Goto Maneuver
-      //srv.request.tolerance = go_to_tolerance_;
-      if (srv_running_== false) { // 
-          if (!client_goto_.call(srv)) { // no bloking go to --> it does not waits until the threat is terminated. the return 
-            // indicates the result of the Go to: goal reached = true, a problem = false. If we block the goto, then the system is unable to respond to an 
-            // abort or stop mission. 
-            ROS_ERROR_STREAM("Failed to call service Go to with Yaw " ); //
-            return false;
-          }
-        srv_running_ = true; 
-        ROS_INFO_STREAM("Go to service Started!");
-        return true;
-        // TODO
+    } else { // for simply goto. Do the goto only if the desired goal has been reached 
+      ROS_INFO_STREAM("[GOTO]: GOTO to the goal point !");
+      srv_running_ = true; 
+      if (client_goto_block_.call(srv)) { // bloking go to 
+        if (!stopped_) { // if the mission is stoped before it reaches the goal point this variable is set in another threat
+          // and the call service returns before the vehicle reaches the goal.  
+          ROS_INFO_STREAM("[GOTO]: Blocking GOTO service Finished!");
+          srv_running_ = false; 
+          return true;
+        } else {
+          stopped_ = false ; 
+          ROS_INFO_STREAM("[GOTO]: Blocking GOTO service Stoped !");
+          srv_running_ = false; 
+          return false;
         }
+
+      } else {
+        srv_running_ = false; 
+        ROS_ERROR_STREAM("[GOTO]: Failed to call service GOTO " ); //
+        return false;
+      }
+
+      // necessites un GOTO que bloqueji, per tal de que quan el cridis, no avanci 
+      // el FOR dels mission points.
+      // el llenço a un altre THREAD per tal de que no BLOQUEJI tambe el BROKER
+      // De manera que poguem rebre aborts...
     }
   }
 
@@ -167,19 +193,32 @@ void Timer_keep_pos(const ros::TimerEvent&) {
      *
      * @return     true if successful
      */
-    bool PlayMission() {
-      ROS_INFO_STREAM("[ turbot_imc_broker ] Loading Mission !");
-      if (mission.size() == 0) {
-        ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
-        return false;
-      }
-
-      for (size_t i = 0; i < mission.size(); i++) {
-        Goto(mission.points_[i]);
-      }
+  bool PlayMission() {
+    ROS_INFO_STREAM("[ turbot_imc_broker ] Loading Mission !");
+    if (mission.size() == 0) {
+      ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
+      return false;
     }
+// calling the GOTOs from a different thread assures the response to an external request of STOP mission from a PLanDBControl
+    boost::thread* t;
+    t = new boost::thread(&TurbotAUV::PlayMissionThread, this);
+  }
+
+  void PlayMissionThread() {
+    bool success; 
+    for (size_t i = 0; i < mission.size(); i++) {
+      // break en funció alguna varible si hi ha STOP perque no segueixi enviant GOTOS
+      success = Goto(mission.points_[i]);
+      if (!success) { // if not success (stopped, no goto service, or no keep position service...)), do not continue the mission.... 
+        break;
+      }   
+    } // once the mission has been finished or stoped, clear the vector
+    mission.points_.clear();
+    is_plan_loaded_ = false;
+  }
 
  private:
+  
   void MissionStatusCallback(const safety::MissionStatus& msg) {
     if (msg.current_wp > 0) { // A plan is under execution
       plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
@@ -188,31 +227,31 @@ void Timer_keep_pos(const ros::TimerEvent&) {
       plan_control_state_.man_id = std::to_string(msg.current_wp);
       // plan_control_state_.man_id ??;
       plan_control_state_.man_eta = -1;
+      plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
+      ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", " 
+        << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     } else { // No plan under execution ...
       if (is_plan_loaded_) { // ... and a plan is loaded.
         plan_control_state_.state = IMC::PlanControlState::PCS_READY;
+        plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
       } else { // ... and no plan is loaded.
         plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
+        plan_control_state_.plan_id = "Mission status -- No plan Loaded";
       }
     }
 
-    if (is_plan_loaded_) {
-      plan_control_state_.plan_id = "last_plan SRV Group Turbot ";
-    } else {
-      plan_control_state_.plan_id = "";
-    }
     plan_control_state_.last_outcome = plan_control_state_.state;
   }
 
-  bool is_plan_loaded_;
+
   ros::ServiceClient recovery_actions_;
-  ros::ServiceClient client_goto_;
   ros::ServiceClient client_goto_block_;
   ros::ServiceClient client_disable_goto_;
   ros::ServiceClient client_enable_keep_position_;
   ros::ServiceClient client_disable_keep_position_;
 
-  bool srv_stationkeeping_ = false, srv_running_= false;
+  bool srv_stationkeeping_;
+  bool srv_running_;
 };
 
 

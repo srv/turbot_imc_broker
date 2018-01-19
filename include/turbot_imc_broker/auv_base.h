@@ -52,7 +52,7 @@
 #define TIME_PER_MISSION_STEP   100
 #define MAX_BUFFER_LENGTH (65535)
 
-static std::vector<char> ComputeMD5(const IMC::PlanSpecification& spec) {
+static std::vector<char> ComputeMD5(const IMC::Message& spec) {
   uint8_t buffer[MAX_BUFFER_LENGTH];
   spec.serializeFields(buffer);
   size_t bsize = spec.getPayloadSerializationSize();
@@ -212,7 +212,8 @@ class AuvBase { // parent class
   auv_msgs::NavSts nav_sts_;
 
   bool nav_sts_received_;
-  bool is_plan_loaded_;
+  bool is_plan_loaded_, stopped_;
+  std::string plan_id_; // necessary to store the plan id between consecutive PlanDB messages
 
   // IMC messages
   IMC::PlanControl plan_control_;
