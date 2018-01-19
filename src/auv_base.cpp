@@ -26,7 +26,7 @@
 
 #include <fstream>
 
-AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false) {
+AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false), stopped_(false) {
   // Get parameters from parameter server
   nh.param("outdir", params.outdir, std::string(""));
   nh.param("filename", params.filename, std::string(""));
@@ -126,7 +126,51 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
 void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   // Copy message
   nav_sts_ = *msg;
+  double dist, d1=0, d2=0, d0=0, total_distance=0; // driven distances
+  /* calculate the mission status for the Plan Control State and publish */
+  if (is_plan_loaded_){
+    
+    if (mission.current_goal_point_ == 0) {
+      // distance between the vehicle current position and the initial vehicle position
+      dist = sqrt(pow((nav_sts_.position.north - mission.initial_mission_north_),
+      2.0) + pow((nav_sts_.position.east - mission.initial_mission_east_),2.0));
+      total_distance = dist;
+    } else { 
+      // distance initial vehicle location to the first point
+      d0 = sqrt(pow(mission.points_.at(0).north - mission.initial_mission_north_,2.0) 
+        + pow(mission.points_.at(0).east - mission.initial_mission_east_,2.0)); 
+      // distance current vehicle location to the previous point
+      d1 = sqrt(pow(nav_sts_.position.north - mission.points_.at(mission.current_goal_point_-1).north,
+      2.0) + pow(nav_sts_.position.east - mission.points_.at(mission.current_goal_point_-1).east,2.0)); 
+      // previous distances between mission points
+      for (int j = 0; j < (mission.current_goal_point_-1); j++) {
+          d2 = d2 + mission.distances_.at(j);
+      }
+      total_distance = d0 + d1 + d2 ; 
+    }
 
+
+    plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
+    plan_control_state_.plan_eta = mission.total_distance() * TIME_PER_MISSION_STEP;
+    plan_control_state_.plan_progress = (float(total_distance)/float(mission.total_distance()))*100;
+    std::string man_id ; 
+    man_id = "Next goal point order number" + std::to_string(mission.current_goal_point_); 
+    plan_control_state_.man_id = man_id;
+    // plan_control_state_.man_id ??;
+    plan_control_state_.man_eta = -1;
+    plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
+    ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", " 
+      << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
+    plan_control_state_.last_outcome = plan_control_state_.state;
+  }  else { // No plan under execution ...
+      
+        ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id); 
+        plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
+        plan_control_state_.plan_id = "Mission status -- No plan Loaded";
+      
+  }
+
+  /* publish the Estimated State */
   IMC::EstimatedState imc_msg;
   imc_msg.setSource(params.auv_id);
   imc_msg.setSourceEntity(params.entity_id);
@@ -199,12 +243,16 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) TODO should be able to modify
+    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) 
     if (mission.size() > 0){
-      is_plan_loaded_ = true;    
+      is_plan_loaded_ = true;
+      mission.initial_distance_= sqrt(pow((nav_sts_.position.north - mission.points_.at(0).north),
+      2.0) + pow((nav_sts_.position.east - mission.points_.at(0).east),2.0));
+      mission.total_mission_distance_ = mission.initial_distance_ + mission.total_distance();   // calculate mission distances 
     } else {
       is_plan_loaded_ = false;
     }
+
     ROS_INFO_STREAM("[turbot_imc_broker]: Result of Plan DB Load: " << is_plan_loaded_);
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
@@ -283,10 +331,14 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
       mission.parse(*plan_specification); // store a list of goal points in a vector called mission
       if (mission.size() > 0){
-      is_plan_loaded_ = true;    
+       is_plan_loaded_ = true;
+        mission.initial_distance_= sqrt(pow((nav_sts_.position.north - mission.points_.at(0).north),
+          2.0) + pow((nav_sts_.position.east - mission.points_.at(0).east),2.0));
+        mission.total_mission_distance_ = mission.initial_distance_ + mission.total_distance();   // calculate mission distances 
       } else {
-      is_plan_loaded_ = false;
+        is_plan_loaded_ = false;
       }
+
       plan_db_.arg.set(plan_specification_);
       plan_db_.plan_id= msg.plan_id;
     }

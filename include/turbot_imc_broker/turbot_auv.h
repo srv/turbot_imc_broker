@@ -73,11 +73,13 @@ class TurbotAUV : public AuvBase {
     //if (srv_running_){
     ROS_INFO("[turbot_imc_broker]: STOPPING PLAN");
     stopped_=true;
+    mission.points_.clear();
+    is_plan_loaded_= false; 
     if (srv_running_) {
-    ROS_INFO("[turbot_imc_broker]: STOPPING GOTO MISSION");
-    std_srvs::Empty disable_goto; 
-    client_disable_goto_.call(disable_goto); // dissable the goto maneuver
-    srv_running_=false;
+      ROS_INFO("[turbot_imc_broker]: STOPPING GOTO MISSION");
+      std_srvs::Empty disable_goto; 
+      client_disable_goto_.call(disable_goto); // dissable the goto maneuver
+      srv_running_=false;
     }
     //}  
     if(srv_stationkeeping_){
@@ -199,6 +201,8 @@ class TurbotAUV : public AuvBase {
       ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
       return false;
     }
+    mission.initial_mission_north_ = nav_sts_.position.north; //set  mission initial vehicle real position
+    mission.initial_mission_east_ =  nav_sts_.position.east; // for mission status calculation
 // calling the GOTOs from a different thread assures the response to an external request of STOP mission from a PLanDBControl
     boost::thread* t;
     t = new boost::thread(&TurbotAUV::PlayMissionThread, this);
@@ -209,6 +213,7 @@ class TurbotAUV : public AuvBase {
     for (size_t i = 0; i < mission.size(); i++) {
       // break en funció alguna varible si hi ha STOP perque no segueixi enviant GOTOS
       success = Goto(mission.points_[i]);
+      mission.current_goal_point_ = i; // for mission status calculation
       if (!success) { // if not success (stopped, no goto service, or no keep position service...)), do not continue the mission.... 
         break;
       }   

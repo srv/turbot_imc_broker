@@ -65,6 +65,7 @@ class Mission {
 
     // Get NED origin
     double ned_lat = 0.0, ned_lon = 0.0;
+    initial_distance_ = 0.0;
     if (nh.hasParam(param_ned_lat) && nh.hasParam(param_ned_lon)) {
       nh.getParamCached(param_ned_lat, ned_lat);
       nh.getParamCached(param_ned_lon, ned_lon);
@@ -78,6 +79,7 @@ class Mission {
     ROS_INFO_STREAM("[turbot_imc_broker]: Store Follow Path starting point (" 
       << msg.lat << ", " << msg.lon << ")"); // lat and lon of stating point
     double north, east, depth;
+    
     MissionPoint point;
     // NED starting position 
     ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
@@ -135,6 +137,7 @@ class Mission {
     points_.push_back(point);
   }
 
+
   void parse(const IMC::PlanSpecification& msg) {
 
     // Delete previous mission
@@ -175,8 +178,23 @@ class Mission {
     return raw_msg_;
   }
 
+
   void run() {
 
+  }
+
+
+  double total_distance() {
+    int i = 0;
+    double d0 = 0.0, D = 0;
+    // distance between the initial vehicle position and the first goal point
+    d0 = sqrt(pow(points_.at(0).north - initial_mission_north_, 2.0) + pow(points_.at(0).east - initial_mission_east_,2.0)); 
+    for(i = 0; i < (points_.size()-1); i++) { // length of mission segments
+      distances_.at(i) = sqrt(pow((points_.at(i+1).north-points_.at(i).north),2.0) + pow((points_.at(i+1).east-points_.at(i).east), 2.0));
+      D = D + distances_.at(i);
+    }    
+    ROS_WARN_STREAM("[turbot_imc_broker]: Mission - Plan Total Distance " << D );
+    return D + d0;
   }
 
   size_t size() const {
@@ -184,9 +202,18 @@ class Mission {
   }
 
   std::vector<MissionPoint> points_;
+  double initial_distance_; // initial distance between the vehicle and the first goal point at the start of the mission
+  double total_mission_distance_;
+  double current_goal_point_;
+  double initial_mission_north_;
+  double initial_mission_east_;
+  std::vector<double> distances_; // distances between points of the path
+ 
  private:
   IMC::PlanSpecification raw_msg_;
   Ned* ned_;
+  
+ 
 };
 
 #endif // MISSION_H
