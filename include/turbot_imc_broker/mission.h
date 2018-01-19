@@ -135,7 +135,7 @@ class Mission {
     points_.push_back(point);
   }
 
-  bool parse(const IMC::PlanSpecification& msg) {
+  void parse(const IMC::PlanSpecification& msg) {
 
     // Delete previous mission
     points_.clear();
@@ -146,12 +146,10 @@ class Mission {
     IMC::MessageList<IMC::PlanManeuver>::const_iterator it;
     // the PlanSpecification has a MessageList of PlanManeuver called maneuvers,
     // and the MessageList defines the cons_iterator
-    int cont=0;
     for (it = msg.maneuvers.begin();
          it != msg.maneuvers.end(); it++) {
       // Each msg.maneuvers[i] is a PlanManeuver
       // the data part of the PlanManeuver is a Maneuver which inherits from InlineMessage,
-      cont++;
       IMC::Maneuver* maneuver_msg = (*it)->data.get();
       uint16_t maneuver_id = maneuver_msg->getId();
       std::string maneuver_name = maneuver_msg->getName();
@@ -170,10 +168,6 @@ class Mission {
       } else {
         ROS_WARN_STREAM("Maneuver " << maneuver_name << " (" << maneuver_id << ") not implemented!");
       }
-    if (cont > 0) {
-      is_plan_loaded=true;
-      return is_plan_loaded;
-      } // plan loaded -- consider = true if a list of goal points is loaded into the mission vector.  
     }
   }
 

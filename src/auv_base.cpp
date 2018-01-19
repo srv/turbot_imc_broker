@@ -199,7 +199,12 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    is_plan_loaded_ = mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) TODO should be able to modify
+    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) TODO should be able to modify
+    if (mission.size() > 0){
+      is_plan_loaded_ = true;    
+    } else {
+      is_plan_loaded_ = false;
+    }
     ROS_INFO_STREAM("[turbot_imc_broker]: Result of Plan DB Load: " << is_plan_loaded_);
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
@@ -276,7 +281,12 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       const IMC::Message* cmsg = msg.arg.get();
       IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
-      is_plan_loaded_ = mission.parse(*plan_specification); // store a list of goal points in a vector called mission
+      mission.parse(*plan_specification); // store a list of goal points in a vector called mission
+      if (mission.size() > 0){
+      is_plan_loaded_ = true;    
+      } else {
+      is_plan_loaded_ = false;
+      }
       plan_db_.arg.set(plan_specification_);
       plan_db_.plan_id= msg.plan_id;
     }

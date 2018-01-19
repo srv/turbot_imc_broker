@@ -232,9 +232,11 @@ class TurbotAUV : public AuvBase {
         << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     } else { // No plan under execution ...
       if (is_plan_loaded_) { // ... and a plan is loaded.
+        ROS_INFO_STREAM("[turbot_imc_broker]: is plan loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id); 
         plan_control_state_.state = IMC::PlanControlState::PCS_READY;
         plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
       } else { // ... and no plan is loaded.
+        ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id); 
         plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
         plan_control_state_.plan_id = "Mission status -- No plan Loaded";
       }
