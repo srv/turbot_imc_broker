@@ -20,8 +20,8 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //  DEALINGS IN THE SOFTWARE.
 
-#ifndef SPARUS_AUV_H
-#define SPARUS_AUV_H
+#ifndef INCLUDE_TURBOT_IMC_BROKER_SPARUS_AUV_H_
+#define INCLUDE_TURBOT_IMC_BROKER_SPARUS_AUV_H_
 
 #include <turbot_imc_broker/auv_base.h>
 #include <cola2_msgs/CaptainStatus.h>
@@ -159,7 +159,7 @@ private:
       current_step_++;
       if (not is_mission_aborted_)
       {
-        Goto(mission.points_[i]);
+        Goto(mission.GetNextPoint());
       }
     }
     current_step_ = 0;
@@ -232,4 +232,4 @@ private:
   ros::ServiceClient disable_external_mission_;
 };
 
-#endif  // SPARUS_AUV_H
+#endif  // INCLUDE_TURBOT_IMC_BROKER_SPARUS_AUV_H_

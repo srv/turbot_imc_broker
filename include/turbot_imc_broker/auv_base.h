@@ -20,14 +20,17 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //  DEALINGS IN THE SOFTWARE.
 
-#ifndef AUV_H
-#define AUV_H
+#ifndef INCLUDE_TURBOT_IMC_BROKER_AUV_BASE_H_
+#define INCLUDE_TURBOT_IMC_BROKER_AUV_BASE_H_
 
 #include <ros/ros.h>
 #include <auv_msgs/NavSts.h>
 #include <cyclops_rhodamine_ros/Rhodamine.h>
 
 #include <turbot_imc_broker/mission.h>
+
+// MD5
+#include <ros_imc_broker/Algorithms/MD5.hpp>
 
 // Base IMC template
 #include <ros_imc_broker/ImcTypes.hpp>
@@ -47,20 +50,18 @@
 #include <IMC/Spec/PlanDBInformation.hpp>
 #include <IMC/Spec/Abort.hpp>
 
-#include "md5.h"
 
 #define TIME_PER_MISSION_STEP   100
 #define MAX_BUFFER_LENGTH (65535)
 
-static std::vector<char> ComputeMD5(const IMC::Message& spec) {
+static std::vector<char> ComputeMD5(const IMC::PlanSpecification& spec) {
+  unsigned int sizeP = (unsigned int)spec.getPayloadSerializationSize();
   uint8_t buffer[MAX_BUFFER_LENGTH];
   spec.serializeFields(buffer);
-  size_t bsize = spec.getPayloadSerializationSize();
-  std::string buffer_str(buffer, buffer+bsize);
-  MD5 md5(buffer_str);
-  std::string md5_str = md5.hexdigest();
-  std::vector<char> md5_vec(md5_str.begin(), md5_str.end());
-  return md5_vec;
+  std::vector<char> digest;
+  digest.resize(16);
+  ros_imc_broker::Algorithms::MD5::compute((uint8_t*)&buffer[0], sizeP, (uint8_t*)&digest[0]);
+  return digest;
 }
 
 class AuvBase { // parent class
@@ -73,12 +74,12 @@ class AuvBase { // parent class
     int entity_id;
     double goto_tolerance;          //!> Entity identifier
     // Default settings
-    Params () {
+    Params() {
       outdir            = "/tmp";
       filename          = "rhodamine.csv";
       system_name       = "turbot";
-      auv_id            = 0x2000; // 8192 turbot identifier
-      entity_id         = 0xFF; // 255 turbot identifier
+      auv_id            = 0x2000;  // 8192 turbot identifier
+      entity_id         = 0xFF;    // 255 turbot identifier
       }
   };
   float t_station_keeping;
@@ -108,7 +109,7 @@ class AuvBase { // parent class
   IMC::PlanDBState CreateState(const IMC::PlanSpecification& spec);
   IMC::PlanDBInformation CreateInfo(const IMC::PlanSpecification& spec);
 
-  //@note: Getters in alphabetical order
+  // @note: Getters in alphabetical order
 
   /**
    * @brief      Gets the plan control state.
@@ -225,6 +226,4 @@ class AuvBase { // parent class
   IMC::VehicleState vehicle_state_;
 };
 
-#endif // AUV_H
-
-
+#endif // INCLUDE_TURBOT_IMC_BROKER_AUV_BASE_H_

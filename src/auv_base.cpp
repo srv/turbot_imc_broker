@@ -126,48 +126,26 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
 void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   // Copy message
   nav_sts_ = *msg;
-  double dist, d1=0, d2=0, d0=0, total_distance=0; // driven distances
+  mission.SetCurrentPosition(nav_sts_.position.north, nav_sts_.position.east);
   /* calculate the mission status for the Plan Control State and publish */
   if (is_plan_loaded_){
-    
-    if (mission.current_goal_point_ == 0) {
-      // distance between the vehicle current position and the initial vehicle position
-      dist = sqrt(pow((nav_sts_.position.north - mission.initial_mission_north_),
-      2.0) + pow((nav_sts_.position.east - mission.initial_mission_east_),2.0));
-      total_distance = dist;
-    } else { 
-      // distance initial vehicle location to the first point
-      d0 = sqrt(pow(mission.points_.at(0).north - mission.initial_mission_north_,2.0) 
-        + pow(mission.points_.at(0).east - mission.initial_mission_east_,2.0)); 
-      // distance current vehicle location to the previous point
-      d1 = sqrt(pow(nav_sts_.position.north - mission.points_.at(mission.current_goal_point_-1).north,
-      2.0) + pow(nav_sts_.position.east - mission.points_.at(mission.current_goal_point_-1).east,2.0)); 
-      // previous distances between mission points
-      for (int j = 0; j < (mission.current_goal_point_-1); j++) {
-          d2 = d2 + mission.distances_.at(j);
-      }
-      total_distance = d0 + d1 + d2 ; 
-    }
-
-
     plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
-    plan_control_state_.plan_eta = mission.total_distance() * TIME_PER_MISSION_STEP;
-    plan_control_state_.plan_progress = (float(total_distance)/float(mission.total_distance()))*100;
-    std::string man_id ; 
-    man_id = "Next goal point order number" + std::to_string(mission.current_goal_point_); 
+    float progress = mission.GetProgress();
+    plan_control_state_.plan_eta = (100.0 - progress)*mission.GetTotalLength() * TIME_PER_MISSION_STEP;
+    plan_control_state_.plan_progress = progress;
+    std::string man_id ;
+    man_id = "Current goal idx " + std::to_string(mission.GetCurrentIdx());
     plan_control_state_.man_id = man_id;
     // plan_control_state_.man_id ??;
     plan_control_state_.man_eta = -1;
     plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
-    ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", " 
+    ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
       << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     plan_control_state_.last_outcome = plan_control_state_.state;
   }  else { // No plan under execution ...
-      
-        ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id); 
-        plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
-        plan_control_state_.plan_id = "Mission status -- No plan Loaded";
-      
+    ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
+    plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
+    plan_control_state_.plan_id = "Mission status -- No plan Loaded";
   }
 
   /* publish the Estimated State */
@@ -234,7 +212,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     ROS_INFO("IMC::PlanDB SET");
     const IMC::Message* cmsg = msg.arg.get(); // obtain specification data and cast into a constant pointer type Message
     if (!msg.plan_id.empty()) {
-      plan_id_ = msg.plan_id; // the plan_id needs to be stored in order to recuperated when a PlanDB GET STATE is received. 
+      plan_id_ = msg.plan_id; // the plan_id needs to be stored in order to recuperated when a PlanDB GET STATE is received.
       ROS_INFO_STREAM("[turbot_imc_broker]: Received Plan DB with plan ID: " << plan_db_.plan_id);
     } else {
       plan_db_.plan_id = "No Plan DB ID Received";
@@ -243,12 +221,9 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points) 
-    if (mission.size() > 0){
+    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points)
+    if (mission.size() > 0) {
       is_plan_loaded_ = true;
-      mission.initial_distance_= sqrt(pow((nav_sts_.position.north - mission.points_.at(0).north),
-      2.0) + pow((nav_sts_.position.east - mission.points_.at(0).east),2.0));
-      mission.total_mission_distance_ = mission.initial_distance_ + mission.total_distance();   // calculate mission distances 
     } else {
       is_plan_loaded_ = false;
     }
@@ -260,12 +235,12 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     ROS_INFO("IMC::PlanDB DELETE");
     plan_db_.arg.clear();
     mission.points_.clear();
-    is_plan_loaded_ = false; 
+    is_plan_loaded_ = false;
     plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
     // Should return PlanSpecification
     ROS_INFO("IMC::PlanDB GET");
-    plan_db_.plan_id = plan_id_ ; 
+    plan_db_.plan_id = plan_id_ ;
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_GET_INFO) {
     // Should return PlanDBInformation
@@ -278,13 +253,13 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     ROS_INFO("IMC::PlanDB CLEAR");
     plan_db_.arg.clear();
     mission.points_.clear();
-    is_plan_loaded_ = false; 
+    is_plan_loaded_ = false;
     plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
     ROS_INFO("IMC::PlanDB GET STATE");
     IMC::PlanDBState state = CreateState(plan_specification_);
-    plan_db_.plan_id = plan_id_; 
+    plan_db_.plan_id = plan_id_;
     plan_db_.arg.set(state);
   } else {
     ROS_INFO("IMC::PlanDB operation not implemented");
@@ -303,7 +278,7 @@ IMC::PlanDBState AuvBase::CreateState(const IMC::PlanSpecification& spec) {
   state.change_sid = spec.getSourceEntity();
   state.change_sname = spec.getName();  // TODO: change for source name. Neptus?
   state.plans_info.push_back(CreateInfo(spec));
-  state.md5 = ComputeMD5(state);
+  state.md5 = ComputeMD5(spec);
   return state;
 }
 
@@ -332,22 +307,21 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       mission.parse(*plan_specification); // store a list of goal points in a vector called mission
       if (mission.size() > 0){
        is_plan_loaded_ = true;
-        mission.initial_distance_= sqrt(pow((nav_sts_.position.north - mission.points_.at(0).north),
-          2.0) + pow((nav_sts_.position.east - mission.points_.at(0).east),2.0));
-        mission.total_mission_distance_ = mission.initial_distance_ + mission.total_distance();   // calculate mission distances 
       } else {
         is_plan_loaded_ = false;
       }
 
       plan_db_.arg.set(plan_specification_);
-      plan_db_.plan_id= msg.plan_id;
+      plan_db_.plan_id = msg.plan_id;
+      // Publish reply
+      plan_db_pub_.publish(plan_db_);
     }
- // for each goal point in the list, call Goto method. These goals can be a 
+ // for each goal point in the list, call Goto method. These goals can be a
  // goto (duration=-1) or a station keeping (duration != -1).
- // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored. 
-// if the PlanSpecification contains a Follow Path, a list of points is stored.  
- // goto or a station keeping 
-    PlayMission(); // if Plan_Control_arg is null, run the specification recovered from the Plan DB. 
+ // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored.
+// if the PlanSpecification contains a Follow Path, a list of points is stored.
+ // goto or a station keeping
+    PlayMission(); // if Plan_Control_arg is null, run the specification recovered from the Plan DB.
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
     ROS_INFO("IMC::PlanControl STOP");
@@ -361,7 +335,7 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
   } else {
     ROS_INFO("IMC::PlanControl operation not implemented");
   }
-  plan_db_pub_.publish(plan_db_); // publish a reply of the received plan db, now from a Plan Control 
+  plan_db_pub_.publish(plan_db_); // publish a reply of the received plan db, now from a Plan Control
 }
 
 void AuvBase::AbortCallback(const IMC::Abort& msg) {

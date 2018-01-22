@@ -20,8 +20,8 @@
 //  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //  DEALINGS IN THE SOFTWARE.
 
-#ifndef MISSION_H
-#define MISSION_H
+#ifndef INCLUDE_TURBOT_IMC_BROKER_MISSION_H_
+#define INCLUDE_TURBOT_IMC_BROKER_MISSION_H_
 
 #include <ros/ros.h>
 
@@ -37,15 +37,37 @@
 #include <IMC/Spec/StationKeeping.hpp>
 #include <IMC/Spec/FollowPath.hpp>
 
-class MissionPoint {
+#define DURATION_GOTO -1
+
+class NEPoint {
  public:
-  MissionPoint() : north(0), east(0), z(0), speed(0), duration(0),
+  NEPoint() : north(0), east(0) {
+    // empty
+  }
+
+  NEPoint(const double& n, const double& e) : north(n), east(e) {
+    // empty
+  }
+
+  double DistanceTo(const NEPoint& other) const {
+    return sqrt(pow(north - other.north, 2.0) + pow(east - other.east, 2.0));
+  }
+
+  double north;
+  double east;
+};
+
+/**
+ * @brief      Class for mission point.
+ */
+class MissionPoint : public NEPoint {
+ public:
+  MissionPoint() : NEPoint(), z(0), speed(0), duration(0),
                    radius(0), is_altitude(false) {
     // empty
   }
-  double north;
-  double east;
-  double z; //TODO: he canviat depth per z ja que al poder triar si es depth o altitude amb el bolea de sota crec que és més quarent
+
+  double z;
   double yaw;
   double speed;
   double duration;
@@ -53,9 +75,20 @@ class MissionPoint {
   bool is_altitude;  //! if true, depth is altitude
 };
 
+enum MissionState {
+  MISSION_EMPTY,
+  MISSION_LOADED,
+  MISSION_RUNNING,
+  MISSION_STOPPED,
+  MISSION_ABORTED
+};
+
+/**
+ * @brief      Class for mission.
+ */
 class Mission {
  public:
-  Mission() {
+  Mission() : mission_length_(0), points_idx_(0) {
     ros::NodeHandle nh("~");
 
     std::string param_ned_lat;
@@ -75,57 +108,75 @@ class Mission {
     ned_ = new Ned(ned_lat, ned_lon, 0.0);
   }
 
+  /**
+   * @brief      Pushes a IMC::FollowPath message.
+   *
+   * @param[in]  msg   The message
+   */
   void push_back(const IMC::FollowPath& msg) {
-    ROS_INFO_STREAM("[turbot_imc_broker]: Store Follow Path starting point (" 
-      << msg.lat << ", " << msg.lon << ")"); // lat and lon of stating point
+    ROS_INFO_STREAM("[turbot_imc_broker]: IMC::FollowPath starting point ("
+      << msg.lat << ", " << msg.lon << ")");
+
+    // Get NED reference
     double north, east, depth;
-    
+    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0,
+                       north, east, depth);
+
     MissionPoint point;
-    // NED starting position 
-    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
-    // msg contains a list of Path Points. Extract each point and push it into
-    //the vector 'points'
-    // iterator for the message list of PathPoints
-  //  std::cout << "[turbot_imc_broker]: Follow Path. Points " << *msg.points.end() ;
     IMC::MessageList<IMC::PathPoint>::const_iterator it_fp;
     for (it_fp = msg.points.begin();
-         it_fp != msg.points.end(); it_fp++) { // for each PathPoint in the list 
-            float n = (*it_fp)->x + north;
-            float e = (*it_fp)->y + east;
-            float d = (*it_fp)->z + depth; // ofsets with respect the starting point
-            ROS_INFO_STREAM("[turbot_imc_broker]: Follow Path. Add path waypoint at " << n << ", " << e << ", " << d << ".");
-            point.north = n;
-            point.east = e;
-            point.z = d;
-            point.duration = -1; // just in order to distinguish between goto and station keeping 
-            points_.push_back(point);
+         it_fp != msg.points.end(); it_fp++) {
+      // for each PathPoint in the list offset with respect the starting point
+      float n = (*it_fp)->x + north;
+      float e = (*it_fp)->y + east;
+      float d = (*it_fp)->z + depth;
+      ROS_INFO_STREAM("[turbot_imc_broker]: Adding waypoint at "
+        << n << ", " << e << ", " << d << ".");
+      point.north = n;
+      point.east = e;
+      point.z = d;
+      point.duration = DURATION_GOTO;
+      points_.push_back(point);
     }
   }
 
+  /**
+   * @brief      Pushes a IMC::Goto message.
+   *
+   * @param[in]  msg   The message
+   */
   void push_back(const IMC::Goto& msg) {
-    ROS_INFO_STREAM("[turbot_imc_broker]: Storing Goto message ("
-                    << msg.lat << ", " << msg.lon << ")");
+    ROS_INFO_STREAM("[turbot_imc_broker]: IMC::Goto message ("
+      << msg.lat << ", " << msg.lon << ")");
     double north, east, depth;
-    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
-    ROS_INFO_STREAM("[turbot_imc_broker]: NED (" << north << ", " << east << ")");
-
+    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0,
+                       north, east, depth);
+    ROS_INFO_STREAM("[turbot_imc_broker]: Adding waypoint at "
+      << north << ", " << east << ", " << depth << ".");
     MissionPoint point;
     point.north = north;
     point.east = east;
     point.z = msg.z;
     point.yaw = msg.yaw;
-    point.duration = -1; // just in order to distinguish between goto and station keeping 
+    point.duration = DURATION_GOTO;
     point.speed = msg.speed;
     points_.push_back(point);
   }
 
+  /**
+   * @brief      Pushes a IMC::StationKeeping message.
+   *
+   * @param[in]  msg   The message
+   */
   void push_back(const IMC::StationKeeping& msg) {
-    ROS_INFO_STREAM("[turbot_imc_broker]: Storing StationKeeping message at: ("
-                    << msg.lat << ", " << msg.lon << ")" << " of duration: " << msg.duration);
+    ROS_INFO_STREAM("[turbot_imc_broker]: IMC::StationKeeping message: ("
+      << msg.lat << ", " << msg.lon << ") " << msg.duration << " s");
 
     double north, east, depth;
-    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0, north, east, depth);
-
+    ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0,
+      north, east, depth);
+    ROS_INFO_STREAM("[turbot_imc_broker]: Adding waypoint at "
+      << north << ", " << east << ", " << depth << ".");
     MissionPoint point;
     point.north = north;
     point.east = east;
@@ -138,63 +189,112 @@ class Mission {
   }
 
 
+  /**
+   * @brief      Parses a IMC::PlanSpecification
+   *
+   * @param[in]  msg   The message
+   */
   void parse(const IMC::PlanSpecification& msg) {
-
     // Delete previous mission
     points_.clear();
     bool is_plan_loaded = false;
     raw_msg_ = msg;
 
-    // define it as a variable type const_iterator defined in the MessaList class,
+    ROS_INFO_STREAM("Parsing IMC::PlanSpecification...");
+
+    // PlanSpecification has a MessageList of PlanManeuver called maneuvers,
+    // and the MessageList defines the a const iterator
     IMC::MessageList<IMC::PlanManeuver>::const_iterator it;
-    // the PlanSpecification has a MessageList of PlanManeuver called maneuvers,
-    // and the MessageList defines the cons_iterator
     for (it = msg.maneuvers.begin();
          it != msg.maneuvers.end(); it++) {
       // Each msg.maneuvers[i] is a PlanManeuver
-      // the data part of the PlanManeuver is a Maneuver which inherits from InlineMessage,
       IMC::Maneuver* maneuver_msg = (*it)->data.get();
       uint16_t maneuver_id = maneuver_msg->getId();
       std::string maneuver_name = maneuver_msg->getName();
-      //which has the get() method that returns the pointer to the message (maneuver).
-      // message.hpp has a method called getName which returns the maneuver type
       if (maneuver_id == IMC::Goto::getIdStatic()) {
         IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
-        push_back(*goto_msg);         // store the Goto msg in the vector of points
+        push_back(*goto_msg);
       } else if (maneuver_id == IMC::FollowPath::getIdStatic()) {
         IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
         push_back(*fp_msg);
       } else if (maneuver_id == IMC::StationKeeping::getIdStatic()) {
         IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
-        // store the StationKeeping msg in the vector of points
         push_back(*sk_msg);
       } else {
-        ROS_WARN_STREAM("Maneuver " << maneuver_name << " (" << maneuver_id << ") not implemented!");
+        ROS_WARN_STREAM("Maneuver " << maneuver_name << " (" << maneuver_id
+                        << ") not implemented!");
       }
     }
+    ROS_INFO_STREAM("Parsing successful!");
+    GetTotalLength();
   }
 
-  IMC::PlanSpecification getRaw() {
+  IMC::PlanSpecification GetRaw() {
     return raw_msg_;
   }
 
-
-  void run() {
-
+  double GetTotalLength() {
+    if (mission_length_ == 0) {
+      distances_.resize(points_.size());
+      for (size_t i = 0; i < points_.size(); i++) {
+        double d;
+        if (i == 0) {
+          d = starting_point_.DistanceTo(points_[0]);
+        } else {
+          d = points_[i-1].DistanceTo(points_[i]);
+        }
+        distances_[i] = d;
+        mission_length_ += d;
+        ROS_INFO_STREAM("Distance to " << i << ": " << d);
+      }
+      ROS_INFO_STREAM("[turbot_imc_broker]: Mission - Plan Total Distance " << mission_length_);
+    }
+    return mission_length_;
   }
 
+  MissionPoint GetNextPoint() {
+    MissionPoint p = points_[points_idx_];
+    points_idx_++;
+    return p;
+  }
 
-  double total_distance() {
-    int i = 0;
-    double d0 = 0.0, D = 0;
-    // distance between the initial vehicle position and the first goal point
-    d0 = sqrt(pow(points_.at(0).north - initial_mission_north_, 2.0) + pow(points_.at(0).east - initial_mission_east_,2.0)); 
-    for(i = 0; i < (points_.size()-1); i++) { // length of mission segments
-      distances_.at(i) = sqrt(pow((points_.at(i+1).north-points_.at(i).north),2.0) + pow((points_.at(i+1).east-points_.at(i).east), 2.0));
-      D = D + distances_.at(i);
-    }    
-    ROS_WARN_STREAM("[turbot_imc_broker]: Mission - Plan Total Distance " << D );
-    return D + d0;
+  int GetCurrentIdx() const {
+    if (points_idx_ - 1 > 0)
+      return points_idx_ - 1;
+    else
+      return 0;
+  }
+
+  float GetProgress() {
+    return GetAcomplishedLength() / GetTotalLength() * 100.0;
+  }
+
+  double GetAcomplishedLength() {
+    double acomplished_length = 0;
+
+    for (size_t i = 0; i < GetCurrentIdx(); i++) {
+      acomplished_length += distances_[i];
+    }
+
+    if (GetCurrentIdx() == 0) {
+      acomplished_length += starting_point_.DistanceTo(current_point_);
+    } else {
+      acomplished_length += points_[GetCurrentIdx() - 1].DistanceTo(current_point_);
+    }
+
+    return acomplished_length;
+  }
+
+  MissionState GetState() {
+    return state_;
+  }
+
+  void SetStartingPosition(const double& north, const double& east) {
+    starting_point_ = NEPoint(north, east);
+  }
+
+  void SetCurrentPosition(const double& north, const double& east) {
+    current_point_ = NEPoint(north, east);
   }
 
   size_t size() const {
@@ -203,17 +303,18 @@ class Mission {
 
   std::vector<MissionPoint> points_;
   double initial_distance_; // initial distance between the vehicle and the first goal point at the start of the mission
-  double total_mission_distance_;
-  double current_goal_point_;
-  double initial_mission_north_;
-  double initial_mission_east_;
+  double mission_length_;
+  int points_idx_;
+  NEPoint starting_point_;
+  NEPoint current_point_;
   std::vector<double> distances_; // distances between points of the path
- 
+  MissionState state_;
+
  private:
   IMC::PlanSpecification raw_msg_;
   Ned* ned_;
-  
- 
+
+
 };
 
-#endif // MISSION_H
+#endif // INCLUDE_TURBOT_IMC_BROKER_MISSION_H_

@@ -1,5 +1,5 @@
-#ifndef NED_H
-#define NED_H
+#ifndef INCLUDE_TURBOT_IMC_BROKER_NED_H_
+#define INCLUDE_TURBOT_IMC_BROKER_NED_H_
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -66,4 +66,4 @@ class Ned
     Eigen::Matrix3d __nRe__(const double lat_rad, const double lon_rad);
 };
 
-#endif // NED_H
+#endif  // INCLUDE_TURBOT_IMC_BROKER_NED_H_
