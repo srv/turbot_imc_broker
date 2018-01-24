@@ -139,11 +139,11 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
     // plan_control_state_.man_id ??;
     plan_control_state_.man_eta = -1;
     plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
-    ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
-      << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
+    //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
+    //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     plan_control_state_.last_outcome = plan_control_state_.state;
   }  else { // No plan under execution ...
-    ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
+    //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
     plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
     plan_control_state_.plan_id = "Mission status -- No plan Loaded";
   }
@@ -234,7 +234,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     // Should delete a record
     ROS_INFO("IMC::PlanDB DELETE");
     plan_db_.arg.clear();
-    mission.points_.clear();
+    mission.clear();
     is_plan_loaded_ = false;
     plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
@@ -252,7 +252,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     // Should delete all DB records
     ROS_INFO("IMC::PlanDB CLEAR");
     plan_db_.arg.clear();
-    mission.points_.clear();
+    mission.clear();
     is_plan_loaded_ = false;
     plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {

@@ -37,8 +37,6 @@
 #include <IMC/Spec/StationKeeping.hpp>
 #include <IMC/Spec/FollowPath.hpp>
 
-#define DURATION_GOTO -1
-
 class NEPoint {
  public:
   NEPoint() : north(0), east(0) {
@@ -62,7 +60,7 @@ class NEPoint {
  */
 class MissionPoint : public NEPoint {
  public:
-  MissionPoint() : NEPoint(), z(0), speed(0), duration(0),
+  MissionPoint() : NEPoint(), z(0), speed(0), duration(-1),
                    radius(0), is_altitude(false) {
     // empty
   }
@@ -134,8 +132,9 @@ class Mission {
         << n << ", " << e << ", " << d << ".");
       point.north = n;
       point.east = e;
-      point.z = d;
-      point.duration = DURATION_GOTO;
+      point.z = d + msg.z;
+      point.is_altitude  = (msg.z_units == 2);
+      ROS_INFO_STREAM("Saving point " << n << ", " << e << ", " << d);
       points_.push_back(point);
     }
   }
@@ -157,8 +156,8 @@ class Mission {
     point.north = north;
     point.east = east;
     point.z = msg.z;
+    point.is_altitude  = (msg.z_units == 2);
     point.yaw = msg.yaw;
-    point.duration = DURATION_GOTO;
     point.speed = msg.speed;
     points_.push_back(point);
   }
@@ -188,6 +187,11 @@ class Mission {
     points_.push_back(point);
   }
 
+  void clear() {
+    points_.clear();
+    points_idx_ = 0;
+    mission_length_ = 0;
+  }
 
   /**
    * @brief      Parses a IMC::PlanSpecification
@@ -196,7 +200,7 @@ class Mission {
    */
   void parse(const IMC::PlanSpecification& msg) {
     // Delete previous mission
-    points_.clear();
+    clear();
     bool is_plan_loaded = false;
     raw_msg_ = msg;
 

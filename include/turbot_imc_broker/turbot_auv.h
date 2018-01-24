@@ -76,7 +76,7 @@ class TurbotAUV : public AuvBase {
     //if (srv_running_){
     ROS_INFO("[turbot_imc_broker]: STOPPING PLAN");
     stopped_=true;
-    mission.points_.clear();
+    mission.clear();
     is_plan_loaded_= false;
     if (srv_running_) {
       ROS_INFO("[turbot_imc_broker]: STOPPING GOTO MISSION");
@@ -119,6 +119,7 @@ class TurbotAUV : public AuvBase {
       srv.request.north_lat = p.north;
       srv.request.east_lon = p.east;
       srv.request.z = p.z;
+      srv.request.altitude_mode = p.is_altitude;
       srv.request.tolerance = params.goto_tolerance;
 
     ROS_INFO_STREAM("[turbot_imc_broker]: call to GOTO subrutine, duration:" << p.duration);
@@ -220,7 +221,7 @@ class TurbotAUV : public AuvBase {
         break;
       }
     } // once the mission has been finished or stoped, clear the vector
-    mission.points_.clear();
+    mission.clear();
     is_plan_loaded_ = false;
   }
 
@@ -235,15 +236,15 @@ class TurbotAUV : public AuvBase {
       // plan_control_state_.man_id ??;
       plan_control_state_.man_eta = -1;
       plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
-      ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
-        << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
+      //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
+      //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     } else { // No plan under execution ...
       if (is_plan_loaded_) { // ... and a plan is loaded.
         ROS_INFO_STREAM("[turbot_imc_broker]: is plan loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
         plan_control_state_.state = IMC::PlanControlState::PCS_READY;
         plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
       } else { // ... and no plan is loaded.
-        ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
+        //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
         plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
         plan_control_state_.plan_id = "Mission status -- No plan Loaded";
       }
