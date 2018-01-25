@@ -28,7 +28,7 @@
 #include <cyclops_rhodamine_ros/Rhodamine.h>
 
 #include <turbot_imc_broker/mission.h>
-
+#include "boost/date_time/posix_time/posix_time.hpp"
 // MD5
 #include <ros_imc_broker/Algorithms/MD5.hpp>
 
@@ -213,7 +213,8 @@ class AuvBase { // parent class
   auv_msgs::NavSts nav_sts_;
 
   bool nav_sts_received_;
-  bool is_plan_loaded_, stopped_;
+  bool is_plan_loaded_, stopped_; 
+  std::string filename;
   std::string plan_id_; // necessary to store the plan id between consecutive PlanDB messages
 
   // IMC messages

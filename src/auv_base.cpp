@@ -34,7 +34,6 @@ AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false), 
   nh.param("entity_id", params.entity_id, 0xFF);  // LSTS said 255
   nh.param<std::string>("system_name", params.system_name, std::string("turbot"));
   nh.param<std::string>("outdir", params.outdir, std::string("/tmp"));
-  nh.param<std::string>("filename", params.filename, std::string("rhodamine.csv"));
   nh.param("goto_tolerance", params.goto_tolerance, 5.0);
 
   // Plan control state default values
@@ -109,18 +108,22 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
 
   // Save data in CSV file, required for rsync
   // TODO split the file for each mission, ordered by date
-  // split the file when mission is over.
-  std::string csv_file = params.outdir + "/" + params.filename;
-  std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
-  f_csv << std::fixed << std::setprecision(6)
-        << seconds << ","
-        << latitude << ","
-        << longitude << ","
-        << depth << ","
-        << msg->concentration_ppb << ","
-        << msg->concentration_raw << ","
-        << -1 <<  std::endl;
-  f_csv.close();
+  // split the file when mission is over. // save only if running a mission
+  if (mission.state_ == MISSION_RUNNING) {
+
+    std::string csv_file = params.outdir + "/" + filename;
+    std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
+    f_csv << std::fixed << std::setprecision(6)
+          << seconds << ","
+          << latitude << ","
+          << longitude << ","
+          << depth << ","
+          << msg->concentration_ppb << ","
+          << msg->concentration_raw << ","
+          << -1 <<  std::endl;
+    f_csv.close(); 
+  }
+  
 }
 
 void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
@@ -223,9 +226,11 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     plan_specification_ = *plan_specification;
     mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points)
     if (mission.size() > 0) {
-      is_plan_loaded_ = true;
+      mission.state_ = MISSION_LOADED;
+      //is_plan_loaded_ = true;
     } else {
-      is_plan_loaded_ = false;
+      //is_plan_loaded_ = false;
+      mission.state_ = MISSION_EMPTY;
     }
 
     ROS_INFO_STREAM("[turbot_imc_broker]: Result of Plan DB Load: " << is_plan_loaded_);
@@ -235,7 +240,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     ROS_INFO("IMC::PlanDB DELETE");
     plan_db_.arg.clear();
     mission.clear();
-    is_plan_loaded_ = false;
+    mission.state_ = MISSION_EMPTY;
     plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET) {
     // Should return PlanSpecification
@@ -253,7 +258,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     ROS_INFO("IMC::PlanDB CLEAR");
     plan_db_.arg.clear();
     mission.clear();
-    is_plan_loaded_ = false;
+    mission.state_ = MISSION_EMPTY;
     plan_db_.plan_id = " ";
   } else if (msg.op == IMC::PlanDB::DBOP_GET_STATE) {
     // Should return PlanDbState
@@ -306,9 +311,9 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
       mission.parse(*plan_specification); // store a list of goal points in a vector called mission
       if (mission.size() > 0){
-       is_plan_loaded_ = true;
+       mission.state_ = MISSION_LOADED;
       } else {
-        is_plan_loaded_ = false;
+        mission.state_ = MISSION_EMPTY;
       }
 
       plan_db_.arg.set(plan_specification_);
@@ -322,6 +327,15 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
 // if the PlanSpecification contains a Follow Path, a list of points is stored.
  // goto or a station keeping
     PlayMission(); // if Plan_Control_arg is null, run the specification recovered from the Plan DB.
+    // new rhodamine filename everytime a new mission is played
+    double timestamp = ros::Time::now().toSec();
+    std::string x_str = std::to_string(timestamp);
+    filename = x_str + ".csv";
+    ROS_INFO_STREAM("[turbot_imc_broker]: TIMESTAMP FILENAME for RODAMIN STORAGE: " << filename); 
+
+
+    //filename = timestamp
+
   } else if (msg.op == IMC::PlanControl::PC_STOP) {
     //! Stop Plan.
     ROS_INFO("IMC::PlanControl STOP");

@@ -77,7 +77,9 @@ enum MissionState {
   MISSION_EMPTY,
   MISSION_LOADED,
   MISSION_RUNNING,
+  MISSION_STATION_KEEPING, // mission non stoped by neptus but in a station keeping mode
   MISSION_STOPPED,
+  MISSION_FAILED,
   MISSION_ABORTED
 };
 
@@ -93,6 +95,7 @@ class Mission {
     std::string param_ned_lon;
     nh.param<std::string>("param_ned_lat", param_ned_lat, std::string("/navigator/ned_origin_lat"));
     nh.param<std::string>("param_ned_lon", param_ned_lon, std::string("/navigator/ned_origin_lon"));
+    state_ = MISSION_EMPTY;
 
     // Get NED origin
     double ned_lat = 0.0, ned_lon = 0.0;
@@ -127,13 +130,13 @@ class Mission {
       // for each PathPoint in the list offset with respect the starting point
       float n = (*it_fp)->x + north;
       float e = (*it_fp)->y + east;
-      float d = (*it_fp)->z + depth;
+      float d = (*it_fp)->z + depth; // distance included in the point
       ROS_INFO_STREAM("[turbot_imc_broker]: Adding waypoint at "
         << n << ", " << e << ", " << d << ".");
       point.north = n;
       point.east = e;
-      point.z = d + msg.z;
-      point.is_altitude  = (msg.z_units == 2);
+      point.z = d + msg.z; // add the reference
+      point.is_altitude  = (msg.z_units == 2); // 1 for depth 2 for altitude
       ROS_INFO_STREAM("Saving point " << n << ", " << e << ", " << d);
       points_.push_back(point);
     }
@@ -201,7 +204,6 @@ class Mission {
   void parse(const IMC::PlanSpecification& msg) {
     // Delete previous mission
     clear();
-    bool is_plan_loaded = false;
     raw_msg_ = msg;
 
     ROS_INFO_STREAM("Parsing IMC::PlanSpecification...");
