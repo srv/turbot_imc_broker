@@ -119,6 +119,7 @@ class Mission {
       << msg.lat << ", " << msg.lon << ")");
 
     // Get NED reference
+    
     double north, east, depth;
     ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0,
                        north, east, depth);
@@ -137,7 +138,8 @@ class Mission {
       point.east = e;
       point.z = d + msg.z; // add the reference
       point.is_altitude  = (msg.z_units == 2); // 1 for depth 2 for altitude
-      ROS_INFO_STREAM("Saving point " << n << ", " << e << ", " << d);
+      point.speed = msg.speed; // retrieve the follow path message speed.
+      ROS_INFO_STREAM("Saving point " << n << ", " << e << ", " << d << "SPEED: " << point.speed);
       points_.push_back(point);
     }
   }
@@ -198,10 +200,10 @@ class Mission {
 
   /**
    * @brief      Parses a IMC::PlanSpecification
-   *
+   * north and east : current vehicle position
    * @param[in]  msg   The message
    */
-  void parse(const IMC::PlanSpecification& msg) {
+  void parse(const IMC::PlanSpecification& msg, double& north, double& east) {
     // Delete previous mission
     clear();
     raw_msg_ = msg;
@@ -232,6 +234,7 @@ class Mission {
       }
     }
     ROS_INFO_STREAM("Parsing successful!");
+    SetStartingPosition(north, east); // set the starting position as the vehicle current pose when the mission is received
     GetTotalLength();
   }
 
@@ -246,6 +249,8 @@ class Mission {
         double d;
         if (i == 0) {
           d = starting_point_.DistanceTo(points_[0]);
+          ROS_INFO_STREAM("[GetTotalLength]: Mission - first goal point " << "(" << points_.at(0).north <<  " , " << points_.at(0).east << ")" );
+          ROS_INFO_STREAM("[GetTotalLength]: Mission - starting_point_ " << "(" << starting_point_.north <<  " , " << starting_point_.east << ")" );
         } else {
           d = points_[i-1].DistanceTo(points_[i]);
         }
@@ -260,16 +265,18 @@ class Mission {
 
   MissionPoint GetNextPoint() {
     MissionPoint p = points_[points_idx_];
-    points_idx_++;
-    return p;
+    points_idx_++; // returns the current goal point
+    return p; 
   }
+
 
   int GetCurrentIdx() const {
     if (points_idx_ - 1 > 0)
-      return points_idx_ - 1;
+      return points_idx_ - 1; // decrement since before the index was incrementes in GetNextPoint
     else
       return 0;
   }
+
 
   float GetProgress() {
     return GetAcomplishedLength() / GetTotalLength() * 100.0;
@@ -277,7 +284,6 @@ class Mission {
 
   double GetAcomplishedLength() {
     double acomplished_length = 0;
-
     for (size_t i = 0; i < GetCurrentIdx(); i++) {
       acomplished_length += distances_[i];
     }
@@ -297,6 +303,7 @@ class Mission {
 
   void SetStartingPosition(const double& north, const double& east) {
     starting_point_ = NEPoint(north, east);
+    ROS_INFO_STREAM("[turbot_imc_broker]: Mission - Starting Point " << "(" << starting_point_.north <<  " , " << starting_point_.east << ")" );
   }
 
   void SetCurrentPosition(const double& north, const double& east) {

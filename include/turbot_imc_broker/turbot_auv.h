@@ -76,6 +76,7 @@ class TurbotAUV : public AuvBase {
     // can be a GOTO or a station keeping. At the moment, only controlled if GOTO.
     //if (srv_running_){
     ROS_INFO("[turbot_imc_broker]: STOPPING PLAN");
+  //  ROS_INFO_STREAM("[turbot_imc_broker]:  STOPPING PLAN. mission State:" << mission.state_);
     mission.clear();
     //is_plan_loaded_= false;
     if (mission.state_ == MISSION_RUNNING) {
@@ -85,7 +86,7 @@ class TurbotAUV : public AuvBase {
       mission.state_ = MISSION_STOPPED;
     }
     //}
-    if(mission.state_ == MISSION_STATION_KEEPING){
+    if(mission.state_ == MISSION_STATION_KEEPING){ 
       ROS_INFO("[turbot_imc_broker]: STOPPING STATION KEEPING MISSION");
       std_srvs::Empty disable_keep_position;
       client_disable_keep_position_.call(disable_keep_position); // dissable the station keeping}
@@ -138,8 +139,9 @@ class TurbotAUV : public AuvBase {
           ROS_INFO_STREAM("[Station Keeping]: GOTO to the goal point terminated !");
           std_srvs::Empty keep_position;
           ROS_INFO_STREAM("[Station Keeping]: Enable KEEP POSITION !");
-          client_enable_keep_position_.call(keep_position); // enable no blocking keep position.
           mission.state_ = MISSION_STATION_KEEPING;
+        //  ROS_INFO_STREAM("[turbot_imc_broker]: mission State:" << mission.state_);
+          client_enable_keep_position_.call(keep_position); // enable no blocking keep position.
           if (p.duration > 0) { // keep position of limited duration. If duration=0 --> unlimited. 
             t_station_keeping=p.duration; //set the duration of the station keeping time
             ros::Duration(t_station_keeping).sleep(); // sleep for t_station_keeping seconds
@@ -155,7 +157,7 @@ class TurbotAUV : public AuvBase {
 
       } else { // the go to service has had a problem
         ROS_ERROR_STREAM("[Station Keeping]: Failed to call service GOTO " ); //
-        mission.state_ == MISSION_FAILED;
+        mission.state_ = MISSION_FAILED;
         return false;
       }
 
@@ -179,7 +181,7 @@ class TurbotAUV : public AuvBase {
         }
 
       } else {
-        mission.state_ == MISSION_FAILED;
+        mission.state_ = MISSION_FAILED;
         ROS_ERROR_STREAM("[GOTO]: Failed to call service GOTO " ); //
         return false;
       }
@@ -197,12 +199,12 @@ class TurbotAUV : public AuvBase {
    * @return     true if successful
    */
   bool PlayMission() {
-    ROS_INFO_STREAM("[ turbot_imc_broker ] Loading Mission !");
     if (mission.state_ != MISSION_LOADED) {
       ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
       return false;
     }
-    mission.SetStartingPosition(nav_sts_.position.north, nav_sts_.position.east);
+    ROS_INFO_STREAM("[ turbot_imc_broker ] Running Mission !");
+   // mission.SetStartingPosition(nav_sts_.position.north, nav_sts_.position.east);
 
     // calling the GOTOs from a different thread assures the response to an external request of STOP mission from a PLanDBControl
     boost::thread* t;
@@ -219,7 +221,10 @@ class TurbotAUV : public AuvBase {
       }
     } // once the mission has been finished or stoped, clear the vector
     mission.clear();
-    mission.state_ = MISSION_EMPTY;
+    if (mission.state_ != MISSION_STATION_KEEPING) { 
+      mission.state_ = MISSION_EMPTY; // we can not set the state to empty is there is 
+      // a station keeping on line. Otherwise the STOP indefinide Station keeping does not work
+    }
   }
 
  private:

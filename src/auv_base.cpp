@@ -131,7 +131,8 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   nav_sts_ = *msg;
   mission.SetCurrentPosition(nav_sts_.position.north, nav_sts_.position.east);
   /* calculate the mission status for the Plan Control State and publish */
-  if (is_plan_loaded_){
+  //ROS_INFO_STREAM("[turbot_imc_broker]: NavStatus Callback:Mission State :" << mission.state_);
+  if (mission.state_ == MISSION_RUNNING){
     plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
     float progress = mission.GetProgress();
     plan_control_state_.plan_eta = (100.0 - progress)*mission.GetTotalLength() * TIME_PER_MISSION_STEP;
@@ -145,10 +146,18 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
     //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
     //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     plan_control_state_.last_outcome = plan_control_state_.state;
-  }  else { // No plan under execution ...
+  }  else if (mission.state_ == MISSION_LOADED) {
+    plan_control_state_.state = IMC::PlanControlState::PCS_READY;
+    plan_control_state_.plan_id = plan_db_.plan_id;
+    plan_control_state_.plan_progress = 0.0;
+    plan_control_state_.plan_eta = 0.0;
+
+  } else  { // No plan under execution, or failed, or stoped, empty, or aborted ...
     //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
     plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
     plan_control_state_.plan_id = "Mission status -- No plan Loaded";
+    plan_control_state_.plan_progress = 0.0;
+    plan_control_state_.plan_eta = 0.0;
   }
 
   /* publish the Estimated State */
@@ -224,7 +233,8 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-    mission.parse(*plan_specification); // store plan specification in the mission structure (set of goal points)
+     mission.parse(*plan_specification, nav_sts_.position.north, nav_sts_.position.east);  
+     // store plan specification in the mission structure (set of goal points) and the starting point of the route
     if (mission.size() > 0) {
       mission.state_ = MISSION_LOADED;
       //is_plan_loaded_ = true;
@@ -233,7 +243,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
       mission.state_ = MISSION_EMPTY;
     }
 
-    ROS_INFO_STREAM("[turbot_imc_broker]: Result of Plan DB Load: " << is_plan_loaded_);
+    ROS_INFO_STREAM("[turbot_imc_broker]: Result of Plan DB SET: " << mission.state_);
     plan_db_.arg.set(plan_specification_);
   } else if (msg.op == IMC::PlanDB::DBOP_DEL) {
     // Should delete a record
@@ -309,8 +319,8 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
       const IMC::Message* cmsg = msg.arg.get();
       IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg);
       IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg);
-      mission.parse(*plan_specification); // store a list of goal points in a vector called mission
-      if (mission.size() > 0){
+      mission.parse(*plan_specification, nav_sts_.position.north, nav_sts_.position.east); // store a list of goal points in a vector called mission
+      if (mission.size() > 0){ // we also store the current vehicle position as the starting point of the route
        mission.state_ = MISSION_LOADED;
       } else {
         mission.state_ = MISSION_EMPTY;
