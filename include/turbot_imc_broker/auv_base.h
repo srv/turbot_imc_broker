@@ -82,7 +82,7 @@ class AuvBase { // parent class
       entity_id         = 0xFF;    // 255 turbot identifier
       }
   };
-  float t_station_keeping;
+  double t_station_keeping;
 
   /**
    * @brief      Constructor
@@ -211,7 +211,6 @@ class AuvBase { // parent class
   ros::Timer timer_keep_pos_;
   // ROS messages
   auv_msgs::NavSts nav_sts_;
-
   bool nav_sts_received_;
   bool is_plan_loaded_, stopped_; 
   std::string filename;

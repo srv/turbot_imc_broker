@@ -220,12 +220,15 @@ class Mission {
       uint16_t maneuver_id = maneuver_msg->getId();
       std::string maneuver_name = maneuver_msg->getName();
       if (maneuver_id == IMC::Goto::getIdStatic()) {
+        ROS_WARN_STREAM("Maneuver : " << maneuver_id << " Goto");
         IMC::Goto* goto_msg = IMC::Goto::cast((*it)->data.get());
         push_back(*goto_msg);
       } else if (maneuver_id == IMC::FollowPath::getIdStatic()) {
+        ROS_WARN_STREAM("Maneuver : " << maneuver_id << " FollowPath");
         IMC::FollowPath* fp_msg = IMC::FollowPath::cast((*it)->data.get());
         push_back(*fp_msg);
       } else if (maneuver_id == IMC::StationKeeping::getIdStatic()) {
+        ROS_WARN_STREAM("Maneuver : " << maneuver_id << " Station Keeping");
         IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
         push_back(*sk_msg);
       } else {
@@ -236,6 +239,11 @@ class Mission {
     ROS_INFO_STREAM("Parsing successful!");
     SetStartingPosition(north, east); // set the starting position as the vehicle current pose when the mission is received
     GetTotalLength();
+    mean_velocity = 0.0;
+    accumulated_velocity = 0.0;
+    mean_velocity_counter=1;
+    mean_route_time = 0.0;
+    accumulated_route_time = 0.0;
   }
 
   IMC::PlanSpecification GetRaw() {
@@ -279,21 +287,40 @@ class Mission {
 
 
   float GetProgress() {
-    return GetAcomplishedLength() / GetTotalLength() * 100.0;
+    if ((duration < 0) || (duration == 0)){ // if GOTO or unlimited Station keeping, progress can reach 100% 
+      return GetAcomplishedLength() / GetTotalLength() * 100.0;
+    }
+    if (duration > 0){ // for station keeping of limited duration add the duration of the sk to the total time of mission execution
+      double now = ros::Time::now().toSec();
+      double t1 = now - sk_ti; // the time passed between the start of the mission and now. GetAcomplishedLength()/module_velocity;
+      if (state_ == MISSION_RUNNING){ // update the t2 variable when vehicle is running towards the points where it has to do the S. Keeping
+        accumulated_velocity = accumulated_velocity + module_velocity_;
+        mean_velocity = (accumulated_velocity)/mean_velocity_counter; // mean of all velocity samples along the path towards the starting and the goal point
+        route_time_ = GetTotalLength()/mean_velocity;
+        accumulated_route_time = accumulated_route_time + route_time_;
+        mean_route_time = accumulated_route_time/mean_velocity_counter;
+        mean_velocity_counter++; //use the velocity mean and the mean of the route time to smooth the progress variations
+        // if the instant velocity or the instant route time are used, the global process can exceed the 100%.  
+      } // t2 will be fixed during the SK maneuver. Total time = time to get the point + duration of SK
+      ROS_INFO_STREAM("[turbot_imc_broker]: route_time: " << mean_route_time << "  t1: " << t1 << " mean_velocity_counter: " << mean_velocity_counter << " mean_velocity: " << mean_velocity << "module_velocity_" << module_velocity_);
+      return ( t1 / (duration + mean_route_time) ) * 100.0;
+    }
   }
 
   double GetAcomplishedLength() {
-    double acomplished_length = 0;
-    for (size_t i = 0; i < GetCurrentIdx(); i++) {
-      acomplished_length += distances_[i];
+    double acomplished_length = 0; 
+    if (points_.size() == 1){// just a GOTO maneuver
+      acomplished_length = current_point_.DistanceTo(starting_point_);
+    }else{ // follow path
+      for (size_t i = 0; i < GetCurrentIdx(); i++) {
+        acomplished_length += distances_[i];
+      }
+      if (GetCurrentIdx() == 0) {
+        acomplished_length += starting_point_.DistanceTo(current_point_);
+      } else {
+        acomplished_length += points_[GetCurrentIdx() - 1].DistanceTo(current_point_);
+      }
     }
-
-    if (GetCurrentIdx() == 0) {
-      acomplished_length += starting_point_.DistanceTo(current_point_);
-    } else {
-      acomplished_length += points_[GetCurrentIdx() - 1].DistanceTo(current_point_);
-    }
-
     return acomplished_length;
   }
 
@@ -317,7 +344,16 @@ class Mission {
   std::vector<MissionPoint> points_;
   double initial_distance_; // initial distance between the vehicle and the first goal point at the start of the mission
   double mission_length_;
+  double module_velocity_;
+  double route_time_;
+  double duration; // it has sense only for station keeping maneuvers 
+  double sk_ti; // mission start time
   int points_idx_;
+  double mean_velocity =0.0;
+  double accumulated_velocity; 
+  int mean_velocity_counter;
+  double mean_route_time;
+  double accumulated_route_time;
   NEPoint starting_point_;
   NEPoint current_point_;
   std::vector<double> distances_; // distances between points of the path

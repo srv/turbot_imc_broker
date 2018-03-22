@@ -107,9 +107,9 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
   double depth = nav_sts_.position.depth;
 
   // Save data in CSV file, required for rsync
-  // TODO split the file for each mission, ordered by date
+  // split the file for each mission, ordered by date
   // split the file when mission is over. // save only if running a mission
-  if (mission.state_ == MISSION_RUNNING) {
+  if ((mission.state_ == MISSION_RUNNING) || (mission.state_ == MISSION_STATION_KEEPING)) {
 
     std::string csv_file = params.outdir + "/" + filename;
     std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
@@ -132,7 +132,7 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   mission.SetCurrentPosition(nav_sts_.position.north, nav_sts_.position.east);
   /* calculate the mission status for the Plan Control State and publish */
   //ROS_INFO_STREAM("[turbot_imc_broker]: NavStatus Callback:Mission State :" << mission.state_);
-  if (mission.state_ == MISSION_RUNNING){
+  if (mission.state_ == MISSION_RUNNING || mission.state_ == MISSION_STATION_KEEPING){
     plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
     float progress = mission.GetProgress();
     plan_control_state_.plan_eta = (100.0 - progress)*mission.GetTotalLength() * TIME_PER_MISSION_STEP;
@@ -142,7 +142,7 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
     plan_control_state_.man_id = man_id;
     // plan_control_state_.man_id ??;
     plan_control_state_.man_eta = -1;
-    plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
+    plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missmodule_velocityió capturada del planDB
     //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
     //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
     plan_control_state_.last_outcome = plan_control_state_.state;
@@ -185,6 +185,7 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   imc_msg.psi = msg->orientation.yaw;
 
   // Body-fixed frame speeds
+  mission.module_velocity_= sqrt(pow(msg->body_velocity.x,2) + pow(msg->body_velocity.y,2) + pow(msg->body_velocity.z,2));
   imc_msg.u = msg->body_velocity.x;
   imc_msg.v = msg->body_velocity.y;
   imc_msg.w = msg->body_velocity.z;
@@ -340,7 +341,7 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
     // new rhodamine filename everytime a new mission is played
     double timestamp = ros::Time::now().toSec();
     std::string x_str = std::to_string(timestamp);
-    filename = x_str + ".csv";
+    filename = x_str + ".csv"; // a new rhodamine log file for each plan
     ROS_INFO_STREAM("[turbot_imc_broker]: TIMESTAMP FILENAME for RODAMIN STORAGE: " << filename); 
 
 
