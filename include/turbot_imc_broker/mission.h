@@ -302,7 +302,7 @@ class Mission {
         mean_velocity_counter++; //use the velocity mean and the mean of the route time to smooth the progress variations
         // if the instant velocity or the instant route time are used, the global process can exceed the 100%.  
       } // t2 will be fixed during the SK maneuver. Total time = time to get the point + duration of SK
-      ROS_INFO_STREAM("[turbot_imc_broker]: route_time: " << mean_route_time << "  t1: " << t1 << " mean_velocity_counter: " << mean_velocity_counter << " mean_velocity: " << mean_velocity << "module_velocity_" << module_velocity_);
+     // ROS_INFO_STREAM("[turbot_imc_broker]: route_time: " << mean_route_time << "  t1: " << t1 << " mean_velocity_counter: " << mean_velocity_counter << " mean_velocity: " << mean_velocity << "module_velocity_" << module_velocity_);
       return ( t1 / (duration + mean_route_time) ) * 100.0;
     }
   }

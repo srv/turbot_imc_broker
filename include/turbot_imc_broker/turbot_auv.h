@@ -233,6 +233,7 @@ class TurbotAUV : public AuvBase {
     }
   }
 
+
  private:
 
   // void MissionStatusCallback(const safety::MissionStatus& msg) {
