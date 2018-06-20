@@ -25,7 +25,7 @@
 
 #include <turbot_imc_broker/auv_base.h>
 #include <cola2_msgs/CaptainStatus.h>
-#include <cola2_msgs/RecoveryAction.h>
+#include <cola2_msgs/Recovery.h>
 #include <cola2_msgs/Goto.h>
 #include <boost/thread.hpp>
 #include <std_srvs/Empty.h>
@@ -36,36 +36,37 @@ public:
   SparusAUV() : AuvBase(), is_mission_aborted_(false), current_step_(0)
   {
     plan_status_sub_ = nh.subscribe("/cola2_control/captain_status", 1, &SparusAUV::CaptainStatusCallback, this);
-
-    ROS_INFO_STREAM_THROTTLE(1, "[ turbot_imc_broker ] Waiting for safety service...");
-    recovery_actions_ = nh.serviceClient<cola2_msgs::RecoveryAction>("/cola2_safety/recovery_action");
-    bool is_available = recovery_actions_.waitForExistence(ros::Duration(10));
+    bool is_available = false;
+    ROS_INFO_STREAM_THROTTLE(1, "Waiting for safety service...");
+    recovery_actions_ = nh.serviceClient<cola2_msgs::Recovery>("/cola2_safety/recovery_action");
+    is_available = recovery_actions_.waitForExistence(ros::Duration(10));
     if (!is_available)
     {
-      ROS_ERROR_STREAM("[ turbot_imc_broker ]: RecoveryAction service is not available.");
+      ROS_ERROR_STREAM("RecoveryAction service is not available.");
     }
 
-    ROS_INFO_STREAM_THROTTLE(1, "[ turbot_imc_broker ] Waiting for goto service...");
+    ROS_INFO_STREAM_THROTTLE(1, "Waiting for goto service...");
     goto_srv_ = nh.serviceClient<cola2_msgs::Goto>("/cola2_control/enable_goto");
     is_available = goto_srv_.waitForExistence(ros::Duration(10));
     if (!is_available)
     {
-      ROS_ERROR_STREAM("[ turbot_imc_broker ]: Goto service is not available.");
+      ROS_ERROR_STREAM("Goto service is not available.");
     }
 
-    ROS_INFO_STREAM_THROTTLE(1, "[ turbot_imc_broker ] Waiting for captain services...");
+    ROS_INFO_STREAM_THROTTLE(1, "Waiting for captain services...");
     enable_external_mission_ = nh.serviceClient<std_srvs::Empty>("/captain/enable_external_mission");
     is_available = enable_external_mission_.waitForExistence(ros::Duration(10));
     if (!is_available)
     {
-      ROS_ERROR_STREAM("[ turbot_imc_broker ]: Captain services are not available.");
+      ROS_ERROR_STREAM("Captain services are not available.");
     }
     disable_external_mission_ = nh.serviceClient<std_srvs::Empty>("/captain/disable_external_mission");
     is_available = disable_external_mission_.waitForExistence(ros::Duration(10));
     if (!is_available)
     {
-      ROS_ERROR_STREAM("[ turbot_imc_broker ]: Captain services are not available.");
+      ROS_ERROR_STREAM("Captain services are not available.");
     }
+    ROS_INFO("Init done!");
   }
 
   /**
@@ -75,9 +76,18 @@ public:
    */
   bool Abort()
   {
-    cola2_msgs::RecoveryAction srv;
-    srv.request.error_level = srv.request.EMERGENCY_SURFACE;
-    recovery_actions_.call(srv);
+    ROS_INFO("Aborting Mission");
+    cola2_msgs::Recovery srv;
+    srv.request.requested_action.error_level = srv.request.requested_action.EMERGENCY_SURFACE;
+    if(recovery_actions_.call(srv))
+    {
+      ROS_INFO("Emergency Surface On");
+      mission.state_ = MISSION_ABORTED;
+    }
+    else
+    {
+      ROS_INFO("A problem in the emergency surface");
+    }
   }
 
   /**
@@ -87,10 +97,20 @@ public:
    */
   bool StopMission()
   {
-    cola2_msgs::RecoveryAction srv;
-    srv.request.error_level = srv.request.ABORT_MISSION;
-    recovery_actions_.call(srv);
-    is_mission_aborted_ = true;
+    ROS_INFO("Stopping Plan");
+    mission.clear();
+    cola2_msgs::Recovery srv;
+    srv.request.requested_action.error_level = srv.request.requested_action.ABORT_MISSION;
+    if(recovery_actions_.call(srv))
+    {
+      is_mission_aborted_ = true;
+      ROS_INFO("Stopping Mission");
+      mission.state_ = MISSION_STOPPED;
+    }
+    else
+    {
+      ROS_INFO("A problem in the stop mission command.");
+    }
   }
 
   /**
@@ -130,7 +150,7 @@ public:
       srv.request.keep_position = true;
       srv.request.timeout = p.duration;
     }
-    goto_srv_.call(srv);
+    return goto_srv_.call(srv);
   }
 
   /**
@@ -140,9 +160,9 @@ public:
   */
   bool PlayMission()
   {
-    if (mission.size() == 0)
+    if (mission.state_ != MISSION_LOADED)
     {
-      ROS_INFO_STREAM("[ turbot_imc_broker ] Mission is not loaded!");
+      ROS_INFO_STREAM("Mission is not loaded!");
       return false;
     }
     boost::thread* t;
@@ -154,16 +174,20 @@ private:
   {
     std_srvs::Empty srv;
     enable_external_mission_.call(srv);
+
+    bool goto_success = true;
     for (size_t i = 0; i < mission.size(); i++)
     {
       current_step_++;
-      if (not is_mission_aborted_)
+      if (not is_mission_aborted_ && goto_success)
       {
-        Goto(mission.GetNextPoint());
+        goto_success = Goto(mission.GetNextPoint());
       }
     }
     current_step_ = 0;
     is_mission_aborted_ = false;
+    mission.clear();
+    mission.state_ = MISSION_EMPTY;
     disable_external_mission_.call(srv);
   }
 
