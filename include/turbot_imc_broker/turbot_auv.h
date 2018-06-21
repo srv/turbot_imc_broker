@@ -233,6 +233,10 @@ class TurbotAUV : public AuvBase {
     }
   }
 
+  std::string GetAUVName()
+  {
+    return "turbot";
+  }
 
  private:
 

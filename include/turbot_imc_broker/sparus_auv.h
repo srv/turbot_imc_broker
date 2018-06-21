@@ -137,6 +137,11 @@ public:
    */
   bool Goto(const MissionPoint& p)
   {
+    // --- Take from turbot !!!! (I don't know what it does! --
+    mission.duration = p.duration;
+    mission.sk_ti=0;
+    // --------------------------------------------------------
+
     cola2_msgs::Goto srv;
     srv.request.reference = cola2_msgs::GotoRequest::REFERENCE_NED;
     srv.request.priority = 10;
@@ -192,11 +197,17 @@ public:
     t = new boost::thread(&SparusAUV::PlayMissionThread, this);
   }
 
+  std::string GetAUVName()
+  {
+    return "sparus";
+  }
+
 private:
   void PlayMissionThread()
   {
     std_srvs::Empty srv;
     enable_external_mission_.call(srv);
+    mission.state_ = MISSION_RUNNING;
 
     bool goto_success = true;
     for (size_t i = 0; i < mission.size(); i++)
@@ -230,14 +241,14 @@ private:
       // Check if is a normal cola2 plan or an external mission (Neptus one)
       int mission_steps = msg.total_steps;
       int current = msg.current_step;
-      if (mission_steps < 0)
+      if (mission_steps == 0)
       {
         mission_steps = mission.size();
         current = current_step_;
       }
 
       plan_control_state_.plan_progress = int((float(current) / float(mission_steps)) * 100);
-      plan_control_state_.plan_eta = mission_steps * TIME_PER_MISSION_STEP;
+      plan_control_state_.plan_eta = mission.GetTotalLength() * 2 + float(mission_steps) * 5 + getWaitingTime();
       plan_control_state_.man_id = std::to_string(current);
       // plan_control_state.man_id ??;
       plan_control_state_.man_eta = -1;
@@ -269,6 +280,16 @@ private:
       plan_control_state_.plan_id = "";
     }
     plan_control_state_.last_outcome = plan_control_state_.state;
+  }
+
+  float getWaitingTime()
+  {
+    float wait_time = 0;
+    for (const auto s : mission.points_)
+    {
+      wait_time += s.duration;
+    }
+    return wait_time;
   }
 
   bool is_mission_aborted_;
