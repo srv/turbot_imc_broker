@@ -66,6 +66,21 @@ public:
     {
       ROS_ERROR_STREAM("Captain services are not available.");
     }
+    ROS_INFO_STREAM_THROTTLE(1, "Waiting for enable keep position service...");
+    enable_keep_position_srv_ = nh.serviceClient<std_srvs::Empty>("/cola2_control/enable_keep_position_3dof");
+    is_available = enable_keep_position_srv_.waitForExistence(ros::Duration(10));
+    if (!is_available)
+    {
+      ROS_ERROR_STREAM("Enable keep position service is not available.");
+    }
+
+    ROS_INFO_STREAM_THROTTLE(1, "Waiting for disable keep position service...");
+    disable_keep_position_srv_ = nh.serviceClient<std_srvs::Empty>("/cola2_control/disable_keep_position");
+    is_available = disable_keep_position_srv_.waitForExistence(ros::Duration(10));
+    if (!is_available)
+    {
+      ROS_ERROR_STREAM("Disable keep position service is not available.");
+    }
     ROS_INFO("Init done!");
   }
 
@@ -147,8 +162,16 @@ public:
     srv.request.keep_position = false;
     if (p.duration > 0)
     {
-      srv.request.keep_position = true;
-      srv.request.timeout = p.duration;
+      std_srvs::Empty req;
+      ROS_INFO("KEEP POSITION WAYPOINT");
+      // Reach the waypoint
+      goto_srv_.call(srv);
+      // Keep position for p.duration seconds
+      ros::Duration(5.0).sleep();
+      enable_keep_position_srv_.call(req);
+      ros::Duration(p.duration).sleep();
+      disable_keep_position_srv_.call(req);
+      return true;
     }
     return goto_srv_.call(srv);
   }
@@ -254,6 +277,8 @@ private:
   ros::ServiceClient goto_srv_;
   ros::ServiceClient enable_external_mission_;
   ros::ServiceClient disable_external_mission_;
+  ros::ServiceClient enable_keep_position_srv_;
+  ros::ServiceClient disable_keep_position_srv_;
 };
 
 #endif  // INCLUDE_TURBOT_IMC_BROKER_SPARUS_AUV_H_
