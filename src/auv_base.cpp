@@ -117,6 +117,8 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
   if ((mission.state_ == MISSION_RUNNING) || (mission.state_ == MISSION_STATION_KEEPING)) {
     std::string csv_file = params.outdir + "/" + filename;
     if (!boost::filesystem::exists(csv_file)) {
+      ROS_INFO_STREAM("[turbot_imc_broker]: Creating a new rhodamine log: " << csv_file);
+
       boost::gregorian::date dayte(boost::gregorian::day_clock::universal_day());
       boost::posix_time::ptime midnight(dayte);
       boost::posix_time::ptime
@@ -363,14 +365,14 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
  // for each goal point in the list, call Goto method. These goals can be a
  // goto (duration=-1) or a station keeping (duration != -1).
  // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored.
-// if the PlanSpecification contains a Follow Path, a list of points is stored.
+ // if the PlanSpecification contains a Follow Path, a list of points is stored.
  // goto or a station keeping
     PlayMission(); // if Plan_Control_arg is null, run the specification recovered from the Plan DB.
     // new rhodamine filename everytime a new mission is played
     double timestamp = ros::Time::now().toSec();
     std::string x_str = std::to_string(timestamp);
     filename = x_str + ".csv"; // a new rhodamine log file for each plan
-    ROS_INFO_STREAM("[turbot_imc_broker]: TIMESTAMP FILENAME for RODAMIN STORAGE: " << filename);
+    ROS_INFO_STREAM("[turbot_imc_broker]: New mission starting, preparing rhodamine timestamp: " << filename);
 
 
     //filename = timestamp
