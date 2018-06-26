@@ -126,12 +126,12 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
       boost::posix_time::time_duration td = now - midnight;
 
       std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
-      f_csv << "%% " << params.system_name << ", Cyclops7, Rhodamine, 1 Hz" << std::endl;
-      f_csv << "%% " << dayte.year() << "/" << dayte.month().as_number() << "/"
+      f_csv << "% " << params.system_name << ", Cyclops7, Rhodamine, 1 Hz" << std::endl;
+      f_csv << "% " << dayte.year() << "/" << dayte.month().as_number() << "/"
             << dayte.day() << " " << td.hours() << ":" << td.minutes()
             << std::endl;
-      f_csv << "%% Not valid value (-1)" << std::endl;
-      f_csv << "%% Time (seconds), Latitude (degrees), Longitude (degrees), Depth (meters), Rhodamine (ppb), Rhodamine (raw), Temperature (Celsius)" << std::endl;
+      f_csv << "% Not valid value (-1)" << std::endl;
+      f_csv << "% Time (seconds), Latitude (degrees), Longitude (degrees), Depth (meters), Rhodamine (ppb), Rhodamine (raw), Temperature (Celsius)" << std::endl;
       f_csv.close();
     }
 
