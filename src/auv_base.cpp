@@ -132,32 +132,39 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   mission.SetCurrentPosition(nav_sts_.position.north, nav_sts_.position.east);
   /* calculate the mission status for the Plan Control State and publish */
   //ROS_INFO_STREAM("[turbot_imc_broker]: NavStatus Callback:Mission State :" << mission.state_);
-  if (mission.state_ == MISSION_RUNNING || mission.state_ == MISSION_STATION_KEEPING){
-    plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
-    float progress = mission.GetProgress();
-    plan_control_state_.plan_eta = (100.0 - progress)*mission.GetTotalLength() * TIME_PER_MISSION_STEP;
-    plan_control_state_.plan_progress = progress;
-    std::string man_id ;
-    man_id = "Current goal idx " + std::to_string(mission.GetCurrentIdx());
-    plan_control_state_.man_id = man_id;
-    // plan_control_state_.man_id ??;
-    plan_control_state_.man_eta = -1;
-    plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missmodule_velocityió capturada del planDB
-    //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
-    //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
-    plan_control_state_.last_outcome = plan_control_state_.state;
-  }  else if (mission.state_ == MISSION_LOADED) {
-    plan_control_state_.state = IMC::PlanControlState::PCS_READY;
-    plan_control_state_.plan_id = plan_db_.plan_id;
-    plan_control_state_.plan_progress = 0.0;
-    plan_control_state_.plan_eta = 0.0;
 
-  } else  { // No plan under execution, or failed, or stoped, empty, or aborted ...
-    //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
-    plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
-    plan_control_state_.plan_id = "Mission status -- No plan Loaded";
-    plan_control_state_.plan_progress = 0.0;
-    plan_control_state_.plan_eta = 0.0;
+  if (GetAUVName() == "turbot")
+  {
+    if (mission.state_ == MISSION_RUNNING || mission.state_ == MISSION_STATION_KEEPING)
+    {
+      plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
+      float progress = mission.GetProgress();
+      plan_control_state_.plan_eta = (100.0 - progress) * mission.GetTotalLength() * TIME_PER_MISSION_STEP;
+      plan_control_state_.plan_progress = progress;
+      std::string man_id;
+      man_id = "Current goal idx " + std::to_string(mission.GetCurrentIdx());
+      plan_control_state_.man_id = man_id;
+      // plan_control_state_.man_id ??;
+      plan_control_state_.man_eta = -1;
+      plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missmodule_velocityió capturada del planDB
+      //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
+      //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
+      plan_control_state_.last_outcome = plan_control_state_.state;
+    } else if (mission.state_ == MISSION_LOADED)
+    {
+      plan_control_state_.state = IMC::PlanControlState::PCS_READY;
+      plan_control_state_.plan_id = plan_db_.plan_id;
+      plan_control_state_.plan_progress = 0.0;
+      plan_control_state_.plan_eta = 0.0;
+
+    } else
+    { // No plan under execution, or failed, or stoped, empty, or aborted ...
+      //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
+      plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
+      plan_control_state_.plan_id = "Mission status -- No plan Loaded";
+      plan_control_state_.plan_progress = 0.0;
+      plan_control_state_.plan_eta = 0.0;
+    }
   }
 
   /* publish the Estimated State */

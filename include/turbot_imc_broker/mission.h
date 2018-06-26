@@ -129,9 +129,9 @@ class Mission {
     for (it_fp = msg.points.begin();
          it_fp != msg.points.end(); it_fp++) {
       // for each PathPoint in the list offset with respect the starting point
-      float n = (*it_fp)->x + north;
-      float e = (*it_fp)->y + east;
-      float d = (*it_fp)->z + depth; // distance included in the point
+      double n = (*it_fp)->x + north;
+      double e = (*it_fp)->y + east;
+      double d = (*it_fp)->z + depth; // distance included in the point
       ROS_INFO_STREAM("[turbot_imc_broker]: Adding waypoint at "
         << n << ", " << e << ", " << d << ".");
       point.north = n;

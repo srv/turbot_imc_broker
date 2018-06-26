@@ -137,6 +137,7 @@ class AuvBase { // parent class
   virtual bool StopMission() = 0;
   virtual bool Goto(const MissionPoint& p) = 0;
   virtual bool PlayMission() = 0;
+  virtual std::string GetAUVName() = 0;
 
   ros::NodeHandle nh;
   Mission mission;  //!> Stores PlanDB missions.
