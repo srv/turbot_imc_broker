@@ -24,6 +24,11 @@
 
 #include <tf/tf.h>
 
+#include <boost/filesystem.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include <fstream>
 
 AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false), stopped_(false) {
@@ -110,8 +115,24 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
   // split the file for each mission, ordered by date
   // split the file when mission is over. // save only if running a mission
   if ((mission.state_ == MISSION_RUNNING) || (mission.state_ == MISSION_STATION_KEEPING)) {
-
     std::string csv_file = params.outdir + "/" + filename;
+    if (!boost::filesystem::exists(csv_file)) {
+      boost::gregorian::date dayte(boost::gregorian::day_clock::universal_day());
+      boost::posix_time::ptime midnight(dayte);
+      boost::posix_time::ptime
+         now(boost::posix_time::second_clock::universal_time());
+      boost::posix_time::time_duration td = now - midnight;
+
+      std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
+      f_csv << "%% " << params.system_name << ", Cyclops7, Rhodamine, 1 Hz" << std::endl;
+      f_csv << "%% " << dayte.year() << "/" << dayte.month().as_number() << "/"
+            << dayte.day() << " " << td.hours() << ":" << td.minutes()
+            << std::endl;
+      f_csv << "%% Not valid value (-1)" << std::endl;
+      f_csv << "%% Time (seconds), Latitude (degrees), Longitude (degrees), Depth (meters), Rhodamine (ppb), Rhodamine (raw), Temperature (Celsius)" << std::endl;
+      f_csv.close();
+    }
+
     std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
     f_csv << std::fixed << std::setprecision(6)
           << seconds << ","
@@ -121,9 +142,9 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
           << msg->concentration_ppb << ","
           << msg->concentration_raw << ","
           << -1 <<  std::endl;
-    f_csv.close(); 
+    f_csv.close();
   }
-  
+
 }
 
 void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
@@ -241,7 +262,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-     mission.parse(*plan_specification, nav_sts_.position.north, nav_sts_.position.east);  
+     mission.parse(*plan_specification, nav_sts_.position.north, nav_sts_.position.east);
      // store plan specification in the mission structure (set of goal points) and the starting point of the route
     if (mission.size() > 0) {
       mission.state_ = MISSION_LOADED;
@@ -349,7 +370,7 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
     double timestamp = ros::Time::now().toSec();
     std::string x_str = std::to_string(timestamp);
     filename = x_str + ".csv"; // a new rhodamine log file for each plan
-    ROS_INFO_STREAM("[turbot_imc_broker]: TIMESTAMP FILENAME for RODAMIN STORAGE: " << filename); 
+    ROS_INFO_STREAM("[turbot_imc_broker]: TIMESTAMP FILENAME for RODAMIN STORAGE: " << filename);
 
 
     //filename = timestamp
