@@ -131,7 +131,7 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
             << dayte.day() << " " << td.hours() << ":" << td.minutes()
             << std::endl;
       f_csv << "% Not valid value (-1)" << std::endl;
-      f_csv << "% Time (seconds), Latitude (degrees), Longitude (degrees), Depth (meters), Rhodamine (ppb), Rhodamine (raw), Temperature (Celsius)" << std::endl;
+      f_csv << "% Time (seconds), Latitude (radians), Longitude (radians), Depth (meters), Rhodamine (ppb), Rhodamine (raw), Temperature (Celsius)" << std::endl;
       f_csv.close();
     }
 
