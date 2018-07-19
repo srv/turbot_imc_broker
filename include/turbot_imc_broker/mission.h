@@ -276,7 +276,7 @@ class Mission {
         IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
         push_back(*sk_msg);
       } else if (maneuver_id == IMC::Loiter::getIdStatic()) {
-        ROS_WARN_STREAM("Maneuver : " << maneuver_id << " Station Keeping");
+        ROS_WARN_STREAM("Maneuver : " << maneuver_id << " Loiter");
         IMC::Loiter *lo_msg = IMC::Loiter::cast((*it)->data.get());
         push_back(*lo_msg);
       } else {
