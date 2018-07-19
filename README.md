@@ -20,6 +20,18 @@ A part of this package you need to install and configure several things before r
 * Execute turbot or sparus launch (~/launch)
 * Start Neptus. Open a console based on lauv.ncon and select turbot or sparus through menu: Advanced/Set main vehicle.
 
+#### Neptus:
+* From the Neptus *Desktop* opne `IMC Monitor -> All Messages -> Estimated state or PlanControlState`. 
+This window shows vehicle or mission related status.
+* Open new console: `Consoles -> Open -> <NEPTUS_DIR>/conf/consoles/lauv.ncon`. 
+A voice should anounce that your vehicle is connected.
+
+To program a Mission plan:
+* From the console push `Plan Edition` and select your vehicle name.
+* To ass points in the mission: Press mouse right button and select `Add goto`.
+* Select *goto* information (depth, speed, ...) from the panel that appears when clicking a goto waypoint.
+* To send the mission to your vehicle: select your vehicle name in the top right corner of the console and press the green walking man.
+
 ## Issues:
 * Neptus can connect with ROS but messages from Neptus do not arrive to ROS.
  

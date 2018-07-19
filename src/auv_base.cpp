@@ -24,6 +24,11 @@
 
 #include <tf/tf.h>
 
+#include <boost/filesystem.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include <fstream>
 
 AuvBase::AuvBase() : nh("~"), nav_sts_received_(false), is_plan_loaded_(false), stopped_(false) {
@@ -107,11 +112,29 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
   double depth = nav_sts_.position.depth;
 
   // Save data in CSV file, required for rsync
-  // TODO split the file for each mission, ordered by date
+  // split the file for each mission, ordered by date
   // split the file when mission is over. // save only if running a mission
-  if (mission.state_ == MISSION_RUNNING) {
-
+  if ((mission.state_ == MISSION_RUNNING) || (mission.state_ == MISSION_STATION_KEEPING)) {
     std::string csv_file = params.outdir + "/" + filename;
+    if (!boost::filesystem::exists(csv_file)) {
+      ROS_INFO_STREAM("[turbot_imc_broker]: Creating a new rhodamine log: " << csv_file);
+
+      boost::gregorian::date dayte(boost::gregorian::day_clock::universal_day());
+      boost::posix_time::ptime midnight(dayte);
+      boost::posix_time::ptime
+         now(boost::posix_time::second_clock::universal_time());
+      boost::posix_time::time_duration td = now - midnight;
+
+      std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
+      f_csv << "% " << params.system_name << ", Cyclops7, Rhodamine, 1 Hz" << std::endl;
+      f_csv << "% " << dayte.year() << "/" << dayte.month().as_number() << "/"
+            << dayte.day() << " " << td.hours() << ":" << td.minutes()
+            << std::endl;
+      f_csv << "% Not valid value (-1)" << std::endl;
+      f_csv << "% Time (seconds), Latitude (radians), Longitude (radians), Depth (meters), Rhodamine (ppb), Rhodamine (raw), Temperature (Celsius)" << std::endl;
+      f_csv.close();
+    }
+
     std::fstream f_csv(csv_file.c_str(), std::ios::out | std::ios::app);
     f_csv << std::fixed << std::setprecision(6)
           << seconds << ","
@@ -121,9 +144,9 @@ void AuvBase::RhodamineCallback(const cyclops_rhodamine_ros::RhodamineConstPtr& 
           << msg->concentration_ppb << ","
           << msg->concentration_raw << ","
           << -1 <<  std::endl;
-    f_csv.close(); 
+    f_csv.close();
   }
-  
+
 }
 
 void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
@@ -132,32 +155,39 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   mission.SetCurrentPosition(nav_sts_.position.north, nav_sts_.position.east);
   /* calculate the mission status for the Plan Control State and publish */
   //ROS_INFO_STREAM("[turbot_imc_broker]: NavStatus Callback:Mission State :" << mission.state_);
-  if (mission.state_ == MISSION_RUNNING){
-    plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
-    float progress = mission.GetProgress();
-    plan_control_state_.plan_eta = (100.0 - progress)*mission.GetTotalLength() * TIME_PER_MISSION_STEP;
-    plan_control_state_.plan_progress = progress;
-    std::string man_id ;
-    man_id = "Current goal idx " + std::to_string(mission.GetCurrentIdx());
-    plan_control_state_.man_id = man_id;
-    // plan_control_state_.man_id ??;
-    plan_control_state_.man_eta = -1;
-    plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missió capturada del planDB
-    //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
-    //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
-    plan_control_state_.last_outcome = plan_control_state_.state;
-  }  else if (mission.state_ == MISSION_LOADED) {
-    plan_control_state_.state = IMC::PlanControlState::PCS_READY;
-    plan_control_state_.plan_id = plan_db_.plan_id;
-    plan_control_state_.plan_progress = 0.0;
-    plan_control_state_.plan_eta = 0.0;
 
-  } else  { // No plan under execution, or failed, or stoped, empty, or aborted ...
-    //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
-    plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
-    plan_control_state_.plan_id = "Mission status -- No plan Loaded";
-    plan_control_state_.plan_progress = 0.0;
-    plan_control_state_.plan_eta = 0.0;
+  if (GetAUVName() == "turbot")
+  {
+    if (mission.state_ == MISSION_RUNNING || mission.state_ == MISSION_STATION_KEEPING)
+    {
+      plan_control_state_.state = IMC::PlanControlState::PCS_EXECUTING;
+      float progress = mission.GetProgress();
+      plan_control_state_.plan_eta = (100.0 - progress) * mission.GetTotalLength() * TIME_PER_MISSION_STEP;
+      plan_control_state_.plan_progress = progress;
+      std::string man_id;
+      man_id = "Current goal idx " + std::to_string(mission.GetCurrentIdx());
+      plan_control_state_.man_id = man_id;
+      // plan_control_state_.man_id ??;
+      plan_control_state_.man_eta = -1;
+      plan_control_state_.plan_id = plan_db_.plan_id; // posar nom missmodule_velocityió capturada del planDB
+      //ROS_INFO_STREAM("[turbot_imc_broker]: Mission Status data: " << plan_control_state_.plan_eta << ", "
+      //  << plan_control_state_.plan_progress << ", " << plan_control_state_.man_id);
+      plan_control_state_.last_outcome = plan_control_state_.state;
+    } else if (mission.state_ == MISSION_LOADED)
+    {
+      plan_control_state_.state = IMC::PlanControlState::PCS_READY;
+      plan_control_state_.plan_id = plan_db_.plan_id;
+      plan_control_state_.plan_progress = 0.0;
+      plan_control_state_.plan_eta = 0.0;
+
+    } else
+    { // No plan under execution, or failed, or stoped, empty, or aborted ...
+      //ROS_INFO_STREAM("[turbot_imc_broker]: plan not loaded, plan id: " << is_plan_loaded_ << ", " << plan_db_.plan_id);
+      plan_control_state_.state = IMC::PlanControlState::PCS_BLOCKED;
+      plan_control_state_.plan_id = "Mission status -- No plan Loaded";
+      plan_control_state_.plan_progress = 0.0;
+      plan_control_state_.plan_eta = 0.0;
+    }
   }
 
   /* publish the Estimated State */
@@ -185,6 +215,7 @@ void AuvBase::NavStsCallback(const auv_msgs::NavStsConstPtr& msg) {
   imc_msg.psi = msg->orientation.yaw;
 
   // Body-fixed frame speeds
+  mission.module_velocity_= sqrt(pow(msg->body_velocity.x,2) + pow(msg->body_velocity.y,2) + pow(msg->body_velocity.z,2));
   imc_msg.u = msg->body_velocity.x;
   imc_msg.v = msg->body_velocity.y;
   imc_msg.w = msg->body_velocity.z;
@@ -233,7 +264,7 @@ void AuvBase::PlanDBCallback(const IMC::PlanDB& msg) {
     IMC::Message* ncmsg = const_cast<IMC::Message*>(cmsg); // cast to no constant message because the cast operation in PlanSpecification.hpp is not defined as constant
     IMC::PlanSpecification* plan_specification = IMC::PlanSpecification::cast(ncmsg); // cast to no constant PlanSpecification message
     plan_specification_ = *plan_specification;
-     mission.parse(*plan_specification, nav_sts_.position.north, nav_sts_.position.east);  
+     mission.parse(*plan_specification, nav_sts_.position.north, nav_sts_.position.east);
      // store plan specification in the mission structure (set of goal points) and the starting point of the route
     if (mission.size() > 0) {
       mission.state_ = MISSION_LOADED;
@@ -334,14 +365,14 @@ void AuvBase::PlanControlCallback(const IMC::PlanControl& msg) {
  // for each goal point in the list, call Goto method. These goals can be a
  // goto (duration=-1) or a station keeping (duration != -1).
  // if the PlanSpecification contains a Goto or a Station Keeping, only one point is stored.
-// if the PlanSpecification contains a Follow Path, a list of points is stored.
+ // if the PlanSpecification contains a Follow Path, a list of points is stored.
  // goto or a station keeping
     PlayMission(); // if Plan_Control_arg is null, run the specification recovered from the Plan DB.
     // new rhodamine filename everytime a new mission is played
     double timestamp = ros::Time::now().toSec();
     std::string x_str = std::to_string(timestamp);
-    filename = x_str + ".csv";
-    ROS_INFO_STREAM("[turbot_imc_broker]: TIMESTAMP FILENAME for RODAMIN STORAGE: " << filename); 
+    filename = x_str + ".csv"; // a new rhodamine log file for each plan
+    ROS_INFO_STREAM("[turbot_imc_broker]: New mission starting, preparing rhodamine timestamp: " << filename);
 
 
     //filename = timestamp

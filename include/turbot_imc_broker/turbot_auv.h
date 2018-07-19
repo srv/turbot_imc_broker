@@ -123,8 +123,11 @@ class TurbotAUV : public AuvBase {
       srv.request.z = p.z;
       srv.request.altitude_mode = p.is_altitude;
       srv.request.tolerance = params.goto_tolerance;
+      t_station_keeping = p.duration; //set the duration of the station keeping time
+      mission.duration = t_station_keeping;
+      mission.sk_ti=0;
 
-    ROS_INFO_STREAM("[turbot_imc_broker]: call to GOTO subrutine, duration:" << p.duration);
+    ROS_INFO_STREAM("[turbot_imc_broker]: call to subrutine, duration:" << p.duration);
     if (p.duration > -1) { // for station keeping , first goto to the desired location and then call keep position service.
       // ALERT !! duration in seconds = 0 for unlimited
       ROS_INFO_STREAM("[Station Keeping]: GOTO to the goal point !");
@@ -132,6 +135,7 @@ class TurbotAUV : public AuvBase {
       srv.request.tolerance = params.goto_tolerance;
       // goes to a point and once it is at the desired position, it does a station keeping.
       mission.state_ = MISSION_RUNNING;
+      mission.sk_ti = ros::Time::now().toSec(); // capture the initial instant of the mission
       if (client_goto_block_.call(srv)) {  // init bloking go to --> waits until the threat is terminated. the return
         // indicates the result of the Go to: goal reached = true, a problem = false.
         if (mission.state_ == MISSION_RUNNING ) { // if the mission is stoped before it reaches the goal point this variable is set in another threat
@@ -142,9 +146,10 @@ class TurbotAUV : public AuvBase {
           mission.state_ = MISSION_STATION_KEEPING;
         //  ROS_INFO_STREAM("[turbot_imc_broker]: mission State:" << mission.state_);
           client_enable_keep_position_.call(keep_position); // enable no blocking keep position.
-          if (p.duration > 0) { // keep position of limited duration. If duration=0 --> unlimited. 
-            t_station_keeping=p.duration; //set the duration of the station keeping time
+          if (t_station_keeping > 0) { // keep position of limited duration. If duration=0 --> unlimited. 
+            ROS_INFO_STREAM("[Station Keeping]: System Sleeping.... !" << t_station_keeping << "seconds");
             ros::Duration(t_station_keeping).sleep(); // sleep for t_station_keeping seconds
+            ROS_INFO_STREAM("[Station Keeping]: Sleeping finished.... ");
             FinishKeepPos(); // finish station keeping.
           }
         //if duration = 0 --> unlimited time until a stop mission is requested
@@ -161,11 +166,10 @@ class TurbotAUV : public AuvBase {
         return false;
       }
 
-        // TODO
 
         /* control if the vehicle is in the desired position is missing. Do the station keeping, only if the desired goal has been reached */
 
-    } else { // for simply goto. Do the goto only if the desired goal has been reached
+    } else { // duration for simply goto = -1. Do the goto only if the desired goal has been reached
       ROS_INFO_STREAM("[GOTO]: GOTO to the goal point !");
       mission.state_ = MISSION_RUNNING;
       if (client_goto_block_.call(srv)) { // bloking go to
@@ -220,11 +224,18 @@ class TurbotAUV : public AuvBase {
         break;
       }
     } // once the mission has been finished or stoped, clear the vector
-    mission.clear();
+     // but, attention !!! a limited station keeping will have the state MISSION STOPED, but 
+    //an unlimited Station keeping can be still running and the state will be MISSION_STATION_KEEPING
     if (mission.state_ != MISSION_STATION_KEEPING) { 
+      mission.clear();
       mission.state_ = MISSION_EMPTY; // we can not set the state to empty is there is 
       // a station keeping on line. Otherwise the STOP indefinide Station keeping does not work
     }
+  }
+
+  std::string GetAUVName()
+  {
+    return "turbot";
   }
 
  private:
