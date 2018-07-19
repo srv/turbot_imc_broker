@@ -24,6 +24,7 @@
 #define INCLUDE_TURBOT_IMC_BROKER_MISSION_H_
 
 #include <ros/ros.h>
+#include <math.h>
 
 #include <turbot_imc_broker/ned.h>
 
@@ -36,6 +37,7 @@
 #include <IMC/Spec/Goto.hpp>
 #include <IMC/Spec/StationKeeping.hpp>
 #include <IMC/Spec/FollowPath.hpp>
+#include <IMC/Spec/Loiter.hpp>
 
 class NEPoint {
  public:
@@ -192,6 +194,48 @@ class Mission {
     points_.push_back(point);
   }
 
+  /**
+   * @brief      Pushes a IMC::Loiter message.
+   *
+   * @param[in]  msg   The message
+   */
+  void push_back(const IMC::Loiter &msg){
+    ROS_INFO_STREAM("[turbot_imc_broker]: IMC::Loiter mission center ("
+                    << msg.lat << ", " << msg.lon << ")");
+
+    // Get NED reference
+
+    double north, east, depth;
+    ned_->geodetic2Ned(msg.lat * 180 / M_PI, msg.lon * 180 / M_PI, 0.0,
+                       north, east, depth);
+
+    double r = msg.radius; 
+
+    // Get WPs
+    double wp_dist = 5; //Distance betweeen consecutive WPs, TODO parameterize
+    double perimeter = 2 * M_PI * msg.radius;
+    int wp_num = (int) perimeter / wp_dist;
+    double delta = 2 * M_PI / wp_num;
+    double alpha = 0;
+
+    for (size_t i = 0; i < wp_num; i++)
+    {
+      double n = north + r * sin(alpha);
+      double e = east + r * cos(alpha);
+      double d = msg.z;
+      ROS_INFO_STREAM("[turbot_imc_broker]: Adding waypoint at "
+                      << n << ", " << e << ", " << d << ".");
+      MissionPoint point;
+      point.north = n;
+      point.east = e;
+      point.z = d;
+      point.speed = msg.speed;
+      alpha = alpha + delta;
+      ROS_INFO_STREAM("Saving point " << n << ", " << e << ", " << d << "SPEED: " << point.speed);
+      points_.push_back(point);
+    }
+  }
+
   void clear() {
     points_.clear();
     points_idx_ = 0;
@@ -231,6 +275,10 @@ class Mission {
         ROS_WARN_STREAM("Maneuver : " << maneuver_id << " Station Keeping");
         IMC::StationKeeping* sk_msg = IMC::StationKeeping::cast((*it)->data.get());
         push_back(*sk_msg);
+      } else if (maneuver_id == IMC::Loiter::getIdStatic()) {
+        ROS_WARN_STREAM("Maneuver : " << maneuver_id << " Station Keeping");
+        IMC::Loiter *lo_msg = IMC::Loiter::cast((*it)->data.get());
+        push_back(*lo_msg);
       } else {
         ROS_WARN_STREAM("Maneuver " << maneuver_name << " (" << maneuver_id
                         << ") not implemented!");
