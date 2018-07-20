@@ -111,6 +111,7 @@ class Mission {
     ned_ = new Ned(ned_lat, ned_lon, 0.0);
   }
 
+
   /**
    * @brief      Pushes a IMC::FollowPath message.
    *
@@ -220,6 +221,10 @@ class Mission {
 
     double alpha = 0;
 
+    std::vector<MissionPoint> temp_points;
+    double min_dist=1e6;
+    int min_index=-1;
+
     for (size_t i = 0; i < wp_num; i++)
     {
       double n = north + r * sin(alpha);
@@ -233,9 +238,22 @@ class Mission {
       point.z = d;
       point.speed = msg.speed;
       alpha = alpha + delta;
+
+      double dist=current_point_.DistanceTo(point);
+      if(dist<min_dist){
+        min_dist=dist;
+        min_index=i;
+      }
+
       ROS_INFO_STREAM("Saving point " << n << ", " << e << ", " << d << "SPEED: " << point.speed);
-      points_.push_back(point);
+      temp_points.push_back(point);
     }
+    for (size_t i = 0; i < wp_num; i++)
+    {
+      points_.push_back(temp_points.at((min_index+i)%wp_num));
+    }
+
+
   }
 
   void clear() {
@@ -412,11 +430,6 @@ class Mission {
  private:
   IMC::PlanSpecification raw_msg_;
   Ned* ned_;
-  double current_north_;
-  double current_east_;
-
-
-
 
 };
 
