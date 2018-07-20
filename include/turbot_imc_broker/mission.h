@@ -121,7 +121,7 @@ class Mission {
       << msg.lat << ", " << msg.lon << ")");
 
     // Get NED reference
-    
+
     double north, east, depth;
     ned_->geodetic2Ned(msg.lat*180/M_PI, msg.lon*180/M_PI, 0.0,
                        north, east, depth);
@@ -209,13 +209,15 @@ class Mission {
     ned_->geodetic2Ned(msg.lat * 180 / M_PI, msg.lon * 180 / M_PI, 0.0,
                        north, east, depth);
 
-    double r = msg.radius; 
+    double r = msg.radius;
 
     // Get WPs
     double wp_dist = 5; //Distance betweeen consecutive WPs, TODO parameterize
     double perimeter = 2 * M_PI * msg.radius;
     int wp_num = (int) perimeter / wp_dist;
     double delta = 2 * M_PI / wp_num;
+    if(static_cast<int>(msg.direction)==1) delta=-delta;
+
     double alpha = 0;
 
     for (size_t i = 0; i < wp_num; i++)
@@ -322,7 +324,7 @@ class Mission {
   MissionPoint GetNextPoint() {
     MissionPoint p = points_[points_idx_];
     points_idx_++; // returns the current goal point
-    return p; 
+    return p;
   }
 
 
@@ -335,7 +337,7 @@ class Mission {
 
 
   float GetProgress() {
-    if ((duration < 0) || (duration == 0)){ // if GOTO or unlimited Station keeping, progress can reach 100% 
+    if ((duration < 0) || (duration == 0)){ // if GOTO or unlimited Station keeping, progress can reach 100%
       return GetAcomplishedLength() / GetTotalLength() * 100.0;
     }
     if (duration > 0){ // for station keeping of limited duration add the duration of the sk to the total time of mission execution
@@ -348,7 +350,7 @@ class Mission {
         accumulated_route_time = accumulated_route_time + route_time_;
         mean_route_time = accumulated_route_time/mean_velocity_counter;
         mean_velocity_counter++; //use the velocity mean and the mean of the route time to smooth the progress variations
-        // if the instant velocity or the instant route time are used, the global process can exceed the 100%.  
+        // if the instant velocity or the instant route time are used, the global process can exceed the 100%.
       } // t2 will be fixed during the SK maneuver. Total time = time to get the point + duration of SK
      // ROS_INFO_STREAM("[turbot_imc_broker]: route_time: " << mean_route_time << "  t1: " << t1 << " mean_velocity_counter: " << mean_velocity_counter << " mean_velocity: " << mean_velocity << "module_velocity_" << module_velocity_);
       return ( t1 / (duration + mean_route_time) ) * 100.0;
@@ -356,7 +358,7 @@ class Mission {
   }
 
   double GetAcomplishedLength() {
-    double acomplished_length = 0; 
+    double acomplished_length = 0;
     if (points_.size() == 1){// just a GOTO maneuver
       acomplished_length = current_point_.DistanceTo(starting_point_);
     }else{ // follow path
@@ -394,11 +396,11 @@ class Mission {
   double mission_length_;
   double module_velocity_;
   double route_time_;
-  double duration; // it has sense only for station keeping maneuvers 
+  double duration; // it has sense only for station keeping maneuvers
   double sk_ti; // mission start time
   int points_idx_;
   double mean_velocity =0.0;
-  double accumulated_velocity; 
+  double accumulated_velocity;
   int mean_velocity_counter;
   double mean_route_time;
   double accumulated_route_time;
@@ -410,6 +412,10 @@ class Mission {
  private:
   IMC::PlanSpecification raw_msg_;
   Ned* ned_;
+  double current_north_;
+  double current_east_;
+
+
 
 
 };
